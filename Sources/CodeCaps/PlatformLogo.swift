@@ -102,7 +102,7 @@ public enum PlatformLogoImage {
         "xai": ("grok", "svg"),
         "grok": ("grok", "svg"),
         "grok-cli": ("grok", "svg"),
-        "grok-bot": ("grok", "svg"),
+        "grok-bot": ("grok-bot", "svg"),
         "minimax": ("minimax", "svg"),
         "cursor": ("cursor", "svg"),
     ]
@@ -233,7 +233,8 @@ public enum PlatformLogoImage {
         case "anthropic", "claude": return "sparkles"
         case "openai", "codex": return "cpu"
         case "google-antigravity", "antigravity", "gemini": return "sparkle"
-        case "xai", "grok", "grok-cli", "grok-bot": return "bolt"
+        case "xai", "grok", "grok-cli": return "bolt"
+        case "grok-bot": return "bolt.badge.a"
         case "minimax": return "m.square"
         case "cursor": return "cursorarrow.rays"
         default: return "gauge.with.dots.needle.50percent"
