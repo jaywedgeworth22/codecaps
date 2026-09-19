@@ -205,6 +205,7 @@ struct SettingsSourcesFleetPage: View {
     var body: some View {
         SettingsPage {
             thisMacSection
+            sourcesRankSection
             shareSection
             pullSection
         }
@@ -323,6 +324,112 @@ struct SettingsSourcesFleetPage: View {
             }
         }
         .padding(.top, 2)
+    }
+
+    // MARK: Source Ranking
+
+    /// Per-provider source enable + rank.  Sections only render for providers
+    /// that have more than one observed source — the Settings page should not
+    /// tease a control that has no effect.
+    @ViewBuilder
+    private var sourcesRankSection: some View {
+        let grouped: [(key: String, label: String, sources: [String])] = model.displaySections
+            .map(\.section.providerKey)
+            .reduce(into: [String]()) { acc, key in
+                let sources = model.availableSources(for: key)
+                guard sources.count > 1 else { return }
+                if !acc.contains(key) { acc.append(key) }
+            }
+            .map { key in
+                let label = model.sections.first { $0.providerKey == key }?.providerLabel ?? key
+                return (key: key, label: label, sources: model.availableSources(for: key))
+            }
+        if !grouped.isEmpty {
+            Section {
+                ForEach(grouped, id: \.key) { group in
+                    sourceGroup(for: group.key, label: group.label, sources: group.sources)
+                }
+            } header: {
+                Eyebrow("SOURCES PER PLATFORM")
+            } footer: {
+                Text("CodeCaps pulls each provider's quota from whichever sources can answer." + sentenceGap
+                     + "Turn a source off to drop its windows everywhere — the menu bar, Glance, and Console all skip it." + sentenceGap
+                     + "Reorder to tell CodeCaps which source wins when two disagree; the top of the list is preferred, the bottom is the fallback.")
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func sourceGroup(for providerKey: String, label: String, sources: [String]) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 8) {
+                PlatformLogo(providerKey: providerKey, size: 16)
+                Text(label)
+                    .font(.system(size: 13, weight: .medium))
+                Spacer()
+                Text("\(sources.count) sources")
+                    .font(.system(size: 10))
+                    .foregroundStyle(.tertiary)
+            }
+            ForEach(Array(sources.enumerated()), id: \.element) { index, source in
+                sourceRow(source: source,
+                          index: index,
+                          total: sources.count,
+                          providerKey: providerKey)
+            }
+        }
+        .padding(.vertical, 4)
+    }
+
+    @ViewBuilder
+    private func sourceRow(source: String, index: Int, total: Int, providerKey: String) -> some View {
+        let enabled = !model.disabledSources.contains(source)
+        HStack(spacing: 8) {
+            Toggle("", isOn: Binding(
+                get: { enabled },
+                set: { model.setSourceEnabled($0, source, for: providerKey) }))
+                .labelsHidden()
+                .toggleStyle(.switch)
+                .controlSize(.mini)
+                .help(enabled ? "Hide windows from \(source)" : "Show windows from \(source)")
+                .accessibilityLabel(enabled ? "Hide windows from \(source)" : "Show windows from \(source)")
+
+            Text(source)
+                .font(.system(size: 12, design: .monospaced))
+                .foregroundStyle(enabled ? Theme.ink : .secondary)
+                .lineLimit(1)
+                .truncationMode(.middle)
+                .frame(maxWidth: .infinity, alignment: .leading)
+
+            Text("#\(index + 1)")
+                .font(.system(size: 10, weight: .medium, design: .monospaced))
+                .foregroundStyle(.tertiary)
+                .frame(width: 24, alignment: .trailing)
+
+            Button {
+                model.moveSource(source, by: -1, for: providerKey)
+            } label: {
+                Image(systemName: "arrow.up").font(.system(size: 10))
+            }
+            .buttonStyle(.borderless)
+            .disabled(index == 0)
+            .help("Move \(source) up")
+            .accessibilityLabel("Move \(source) up")
+
+            Button {
+                model.moveSource(source, by: 1, for: providerKey)
+            } label: {
+                Image(systemName: "arrow.down").font(.system(size: 10))
+            }
+            .buttonStyle(.borderless)
+            .disabled(index == total - 1)
+            .help("Move \(source) down")
+            .accessibilityLabel("Move \(source) down")
+        }
+        .padding(.leading, 24)
     }
 
 
