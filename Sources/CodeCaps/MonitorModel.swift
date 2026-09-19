@@ -233,7 +233,7 @@ final class MonitorModel: ObservableObject {
         syncEndpoint = defaults.string(forKey: "syncEndpoint") ?? ""
         syncFormat = QuotaSyncFormat(rawValue: defaults.string(forKey: "syncFormat") ?? "") ?? .usageMonitorV2
 
-        appearance = AppAppearance(rawValue: defaults.string(forKey: "appearance") ?? "") ?? .light
+        appearance = AppAppearance(rawValue: defaults.string(forKey: "appearance") ?? "") ?? .system
         keepConsoleInFront = defaults.bool(forKey: "consoleKeepInFront")
     }
 
