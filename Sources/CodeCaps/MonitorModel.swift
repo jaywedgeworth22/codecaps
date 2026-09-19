@@ -98,6 +98,24 @@ final class MonitorModel: ObservableObject {
             }
         }
     }
+    /// Per-provider mark style.  Defaults to `template` so the menu bar still
+    /// reads on Light and Dark surfaces; `standard` keeps the brand colors,
+    /// `custom` resolves to a user-supplied file.  Persisted as a JSON map so
+    /// new providers land on the default without an explicit row.
+    @Published var markStyles: [String: MarkStyle] {
+        didSet {
+            if let data = try? JSONEncoder().encode(markStyles) {
+                defaults.set(data, forKey: "markStyles")
+            }
+        }
+    }
+    /// Resolved absolute paths for any `custom` mark — written by Settings
+    /// after a file picker returns.  Stored separately so a missing file (the
+    /// owner deleted it from disk) can be reported as such, and so we can
+    /// render the path in the Settings UI without re-scanning the directory.
+    @Published var customMarkPaths: [String: String] {
+        didSet { defaults.set(customMarkPaths, forKey: "customMarkPaths") }
+    }
     @Published private(set) var response = QuotaResponse(generatedAt: "")
     @Published private(set) var isRefreshing = false
     @Published private(set) var lastChecked: Date?
@@ -170,6 +188,13 @@ final class MonitorModel: ObservableObject {
         } else {
             platformCustomInfo = [:]
         }
+        if let styleData = defaults.data(forKey: "markStyles"),
+           let decoded = try? JSONDecoder().decode([String: MarkStyle].self, from: styleData) {
+            markStyles = decoded
+        } else {
+            markStyles = [:]
+        }
+        customMarkPaths = (defaults.dictionary(forKey: "customMarkPaths") as? [String: String]) ?? [:]
         localEnabled = defaults.object(forKey: "localEnabled") as? Bool ?? true
         serverEnabled = defaults.bool(forKey: "serverEnabled")
         hasSavedToken = defaults.bool(forKey: "hasSavedToken")
@@ -326,6 +351,44 @@ final class MonitorModel: ObservableObject {
 
     func setCustomInfo(for providerKey: String, info: PlatformCustomInfo) {
         platformCustomInfo[providerKey] = info
+    }
+
+    // MARK: - Mark Style
+
+    /// The mark style for a provider.  Unknown keys return `.template`, which
+    /// matches the pre-picker default of every shipped mark.
+    func markStyle(for providerKey: String) -> MarkStyle {
+        let key = providerKey.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        return markStyles[key] ?? .template
+    }
+
+    func setMarkStyle(_ style: MarkStyle, for providerKey: String) {
+        let key = providerKey.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        guard markStyles[key] != style else { return }
+        markStyles[key] = style
+    }
+
+    /// Persist a custom mark for `providerKey`.  Reads the file out of the
+    /// picker URL into `~/Library/Application Support/CodeCaps/CustomMarks/`
+    /// via `PlatformLogoImage.importCustomMark`, then records the path so the
+    /// Settings UI can show "Open in Finder" and "Remove".
+    func setCustomMark(at source: URL, for providerKey: String) -> URL? {
+        guard let stored = PlatformLogoImage.importCustomMark(from: source, providerKey: providerKey) else {
+            return nil
+        }
+        let key = providerKey.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        customMarkPaths[key] = stored.path
+        markStyles[key] = .custom
+        return stored
+    }
+
+    func clearCustomMark(for providerKey: String) {
+        let key = providerKey.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        PlatformLogoImage.removeCustomMark(providerKey: key)
+        customMarkPaths.removeValue(forKey: key)
+        // Falling back to the bundled asset is the safer choice: an owner who
+        // removes a custom mark presumably still wants *some* icon.
+        if markStyles[key] == .custom { markStyles[key] = .template }
     }
 
     /// Live binding for the local-readers toggle.  Writing the default and
