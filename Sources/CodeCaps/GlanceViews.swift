@@ -72,7 +72,8 @@ struct GlancePopover: View {
                 GlanceRow(row: row,
                           now: model.now,
                           issue: model.issues[row.providerKey],
-                          origin: .local)
+                          origin: .local,
+                          markStyle: model.markStyle(for: row.providerKey))
             }
             if !fleetGroups.isEmpty {
                 Spacer().frame(height: 12)
@@ -88,7 +89,8 @@ struct GlancePopover: View {
                                 GlanceRow(row: row,
                                           now: model.now,
                                           issue: nil,
-                                          origin: .fleet)
+                                          origin: .fleet,
+                                          markStyle: model.markStyle(for: row.providerKey))
                             }
                         }
                     }
@@ -193,6 +195,7 @@ struct GlanceRow: View {
     let now: Date
     let issue: String?
     let origin: QuotaOrigin
+    let markStyle: MarkStyle
 
     private var section: QuotaPlatformSection { row.section }
 
@@ -236,7 +239,7 @@ struct GlanceRow: View {
 
     var body: some View {
         HStack(spacing: 0) {
-            PlatformLogo(providerKey: section.providerKey, size: 16)
+            PlatformLogo(providerKey: section.providerKey, size: 16, style: markStyle)
                 .frame(width: 16, height: 16)
             Spacer().frame(width: 6)
             VStack(alignment: .leading, spacing: 1) {

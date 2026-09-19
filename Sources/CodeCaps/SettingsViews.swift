@@ -55,8 +55,10 @@ struct SettingsMenuBarPage: View {
                     VStack(alignment: .leading, spacing: 4) {
                         HStack(spacing: 4) {
                             if model.menuBarStyle != .percentOnly {
-                                PlatformLogo(providerKey: model.menuBarTargetSnapshot?.window.canonicalProviderKey ?? "auto",
-                                             size: 14)
+                                let previewKey = model.menuBarTargetSnapshot?.window.canonicalProviderKey ?? "auto"
+                                PlatformLogo(providerKey: previewKey,
+                                             size: 14,
+                                             style: model.markStyle(for: previewKey))
                             }
                             if model.menuBarStyle != .symbolOnly {
                                 Text(model.menuBarTitle.isEmpty ? "—" : model.menuBarTitle)
@@ -110,7 +112,8 @@ struct SettingsPlatformsPage: View {
                             .foregroundStyle(.tertiary)
                             .help("Drag to Reorder")
                             .accessibilityHidden(true)
-                        PlatformLogo(providerKey: providerKey, size: 16)
+                        PlatformLogo(providerKey: providerKey, size: 16,
+                                     style: model.markStyle(for: providerKey))
                         Text(label(for: providerKey)).font(.system(size: 13, weight: .medium))
                         Spacer()
                     }
@@ -252,7 +255,8 @@ struct SettingsSourcesFleetPage: View {
         let needsConsent = model.consentNeeded.contains(reader.providerKey)
         return VStack(alignment: .leading, spacing: 2) {
             HStack(spacing: 8) {
-                PlatformLogo(providerKey: reader.providerKey, size: 16)
+                PlatformLogo(providerKey: reader.providerKey, size: 16,
+                             style: model.markStyle(for: reader.providerKey))
                 Text(section?.providerLabel ?? reader.label)
                     .font(.system(size: 13, weight: .medium))
                     .frame(width: 110, alignment: .leading)
@@ -624,6 +628,107 @@ struct SettingsAppearancePage: View {
                     .font(.system(size: 11))
                     .foregroundStyle(.secondary)
             }
+        }
+    }
+}
+
+// MARK: - Logo Style
+
+struct SettingsLogoStylePage: View {
+    @ObservedObject var model: MonitorModel
+
+    private var orderedKeys: [String] {
+        let live = Set(model.sections.map(\.providerKey))
+        let stored = model.platformOrder.filter(live.contains)
+        let unsorted = live.filter { !stored.contains($0) }.sorted()
+        // `model.sections` already returns rows in the chosen order; mirror it
+        // for the unsorted tail so an owner who never opened Platforms sees the
+        // same list here as on the Platforms page.
+        let canonical = model.sections.map(\.providerKey)
+        let orderedUnsorted = unsorted.sorted { canonical.firstIndex(of: $0) ?? 0 < canonical.firstIndex(of: $1) ?? 0 }
+        return stored + orderedUnsorted
+    }
+
+    private func label(for providerKey: String) -> String {
+        model.sections.first { $0.providerKey == providerKey }?.providerLabel ?? providerKey
+    }
+
+    var body: some View {
+        SettingsPage {
+            Section {
+                ForEach(orderedKeys, id: \.self) { providerKey in
+                    row(for: providerKey)
+                }
+            } header: {
+                Eyebrow("PROVIDER MARKS")
+            } footer: {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Standard keeps the brand colors." + sentenceGap
+                         + "Light/Dark shows a single silhouette that picks up the surface color, which reads on any menu bar tint." + sentenceGap
+                         + "Custom replaces the bundled mark with a file you choose.")
+                    Text("Custom files are stored in ~/Library/Application Support/CodeCaps/CustomMarks/.")
+                }
+                .font(.system(size: 11))
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func row(for providerKey: String) -> some View {
+        let style = model.markStyle(for: providerKey)
+        let customURL = model.customMarkPaths[providerKey].flatMap(URL.init(fileURLWithPath:))
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 10) {
+                PlatformLogo(providerKey: providerKey, size: 18, style: style)
+                Text(label(for: providerKey))
+                    .font(.system(size: 13, weight: .medium))
+                Spacer()
+                Picker("", selection: Binding(
+                    get: { model.markStyle(for: providerKey) },
+                    set: { model.setMarkStyle($0, for: providerKey) })) {
+                    ForEach(MarkStyle.allCases) { Text($0.title).tag($0) }
+                }
+                .labelsHidden()
+                .pickerStyle(.menu)
+                .frame(width: 130)
+                .help("Logo Style for \(label(for: providerKey))")
+                .accessibilityLabel("Logo Style for \(label(for: providerKey))")
+            }
+            if style == .custom {
+                HStack(spacing: 8) {
+                    Button(customURL == nil ? "Choose File…" : "Replace…") { pickCustom(for: providerKey) }
+                        .buttonStyle(.bordered)
+                    if let customURL {
+                        Text(customURL.lastPathComponent)
+                            .font(.system(size: 11))
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                            .truncationMode(.middle)
+                        Button("Show In Finder") {
+                            NSWorkspace.shared.activateFileViewerSelecting([customURL])
+                        }
+                        .buttonStyle(.borderless)
+                        .font(.system(size: 11))
+                        Button("Remove", role: .destructive) { model.clearCustomMark(for: providerKey) }
+                            .buttonStyle(.borderless)
+                            .font(.system(size: 11))
+                    }
+                }
+            }
+        }
+        .padding(.vertical, 2)
+    }
+
+    private func pickCustom(for providerKey: String) {
+        let panel = NSOpenPanel()
+        panel.title = "Choose a Mark for \(label(for: providerKey))"
+        panel.allowedContentTypes = [.svg, .png, .pdf]
+        panel.allowsMultipleSelection = false
+        panel.canChooseDirectories = false
+        if panel.runModal() == .OK, let url = panel.url {
+            model.setCustomMark(at: url, for: providerKey)
         }
     }
 }

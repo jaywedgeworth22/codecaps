@@ -267,6 +267,7 @@ struct PlatformCard: View {
     var wide = false
     var origin: QuotaOrigin = .local
     var customInfo: PlatformCustomInfo? = nil
+    var markStyle: MarkStyle = .template
     /// Set only when the issue is one the owner can actually fix in Settings —
     /// today, the one-time Allow Access To Claude Code step.  The card then
     /// carries the same deep link the fleet banner uses.
@@ -324,7 +325,7 @@ struct PlatformCard: View {
 
     private var header: some View {
         HStack(spacing: 10) {
-            PlatformLogo(providerKey: section.providerKey, size: compact ? 22 : 28)
+            PlatformLogo(providerKey: section.providerKey, size: compact ? 22 : 28, style: markStyle)
                 .frame(width: compact ? 24 : 30, height: compact ? 24 : 30)
             VStack(alignment: .leading, spacing: 2) {
                 Text(section.providerLabel)

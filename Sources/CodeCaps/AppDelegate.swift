@@ -115,16 +115,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
             button.imagePosition = .noImage
         } else {
             let providerKey = target?.window.canonicalProviderKey ?? "auto"
+            let markStyle = target != nil ? model.markStyle(for: providerKey) : .template
             var iconImage: NSImage?
             if target != nil {
-                iconImage = PlatformLogoImage.menuBarImage(providerKey: providerKey)
+                iconImage = PlatformLogoImage.menuBarImage(providerKey: providerKey, style: markStyle)
             }
             if iconImage == nil {
                 let symbolName = target != nil
                     ? PlatformLogoImage.fallbackSymbolName(for: providerKey)
                     : "gauge.with.dots.needle.50percent"
                 iconImage = NSImage(systemSymbolName: symbolName, accessibilityDescription: "CodeCaps")
-                iconImage?.isTemplate = true
+                iconImage?.isTemplate = (markStyle == .template)
             }
             button.image = iconImage
             button.imagePosition = style == .symbolOnly ? .imageOnly : .imageLeading
@@ -225,8 +226,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
             // Restore first, centre only when there is nothing to restore:
             // `center()` after the autosave name discarded the saved origin on
             // every launch.
-            if !window.setFrameUsingName("AgentBarConsoleWindow") { window.center() }
-            window.setFrameAutosaveName("AgentBarConsoleWindow")
+            if !window.setFrameUsingName("CodeCapsConsoleWindow") { window.center() }
+            window.setFrameAutosaveName("CodeCapsConsoleWindow")
             consoleWindow = window
         }
         consoleWindow?.title = consoleState.page.isSettings ? "CodeCaps Settings" : "CodeCaps"

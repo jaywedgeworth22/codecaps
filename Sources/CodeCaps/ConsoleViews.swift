@@ -9,6 +9,7 @@ enum ConsolePage: Hashable {
     case platform(String)
     case settingsMenuBar
     case settingsPlatforms
+    case settingsLogoStyle
     case settingsSourcesFleet
     case settingsAppearance
     case settingsAbout
@@ -26,6 +27,7 @@ enum ConsolePage: Hashable {
         case .platform(let providerKey): return "platform:" + providerKey
         case .settingsMenuBar: return "settingsMenuBar"
         case .settingsPlatforms: return "settingsPlatforms"
+        case .settingsLogoStyle: return "settingsLogoStyle"
         case .settingsSourcesFleet: return "settingsSourcesFleet"
         case .settingsAppearance: return "settingsAppearance"
         case .settingsAbout: return "settingsAbout"
@@ -37,6 +39,7 @@ enum ConsolePage: Hashable {
         case "allPlatforms": return .allPlatforms
         case "settingsMenuBar": return .settingsMenuBar
         case "settingsPlatforms": return .settingsPlatforms
+        case "settingsLogoStyle": return .settingsLogoStyle
         case "settingsSourcesFleet": return .settingsSourcesFleet
         case "settingsAppearance": return .settingsAppearance
         case "settingsAbout": return .settingsAbout
@@ -51,6 +54,7 @@ enum ConsolePage: Hashable {
         switch self {
         case .settingsMenuBar: return "Menu Bar"
         case .settingsPlatforms: return "Platforms"
+        case .settingsLogoStyle: return "Logo Style"
         case .settingsSourcesFleet: return "Sources & Fleet"
         case .settingsAppearance: return "Appearance"
         case .settingsAbout: return "About"
@@ -62,6 +66,7 @@ enum ConsolePage: Hashable {
         switch self {
         case .settingsMenuBar: return "menubar.rectangle"
         case .settingsPlatforms: return "square.grid.2x2"
+        case .settingsLogoStyle: return "photo.on.rectangle.angled"
         case .settingsSourcesFleet: return "arrow.up.arrow.down.circle"
         case .settingsAppearance: return "circle.lefthalf.filled"
         case .settingsAbout: return "info.circle"
@@ -70,7 +75,7 @@ enum ConsolePage: Hashable {
     }
 
     static let settingsPages: [ConsolePage] = [
-        .settingsMenuBar, .settingsPlatforms, .settingsSourcesFleet, .settingsAppearance, .settingsAbout,
+        .settingsMenuBar, .settingsPlatforms, .settingsLogoStyle, .settingsSourcesFleet, .settingsAppearance, .settingsAbout,
     ]
 }
 
@@ -162,6 +167,8 @@ struct ConsoleView: View {
                     SettingsMenuBarPage(model: model)
                 case .settingsPlatforms:
                     SettingsPlatformsPage(model: model)
+                case .settingsLogoStyle:
+                    SettingsLogoStylePage(model: model)
                 case .settingsSourcesFleet:
                     SettingsSourcesFleetPage(model: model)
                 case .settingsAppearance:
@@ -307,7 +314,8 @@ struct ConsoleSidebar: View {
     /// row views is what stops `.listStyle(.sidebar)` aligning them identically.
     private func quotaRow(_ row: DisplaySection) -> some View {
         HStack(spacing: 6) {
-            PlatformLogo(providerKey: row.providerKey, size: 16)
+            PlatformLogo(providerKey: row.providerKey, size: 16,
+                         style: model.markStyle(for: row.providerKey))
             // A pool name is half again as long as a platform name, and
             // "Antigravity · Cl…" hides the very thing the row adds, so the
             // pool takes a second line in this 200pt column.
@@ -552,6 +560,7 @@ struct AllPlatformsPage: View {
                      wide: false,
                      origin: origin,
                      customInfo: model.platformCustomInfo[row.providerKey],
+                     markStyle: model.markStyle(for: row.providerKey),
                      onOpenSettings: model.consentNeeded.contains(row.providerKey)
                         ? { state.page = .settingsSourcesFleet } : nil)
     }
@@ -596,6 +605,7 @@ struct PlatformDetailPage: View {
                              wide: true,
                              origin: model.originByProvider[row.providerKey] ?? .local,
                              customInfo: model.platformCustomInfo[row.providerKey],
+                             markStyle: model.markStyle(for: row.providerKey),
                              onOpenSettings: model.consentNeeded.contains(row.providerKey)
                                 ? { state.page = .settingsSourcesFleet } : nil)
             } else {
