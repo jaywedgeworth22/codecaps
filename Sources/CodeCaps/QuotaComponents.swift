@@ -44,7 +44,11 @@ enum Theme {
 /// site and the SwiftUI root cannot disagree the way the old 580x510 window and
 /// its 620x560 content did.
 enum Metrics {
-    static let glanceWidth: CGFloat = 360
+    /// 400pt gives the footer buttons enough horizontal room for "Open
+    /// CodeCaps ⌘1" without the ⌘1 badge being clipped at the right edge, the
+    /// way the old 360pt width clipped it once the row added the Settings
+    /// gear.
+    static let glanceWidth: CGFloat = 400
     static let glanceMinHeight: CGFloat = 200
     static let glanceGutter: CGFloat = 12
     static let glanceHeaderHeight: CGFloat = 32
@@ -335,7 +339,15 @@ struct PlatformCard: View {
                     Text(subtitleText)
                         .font(.system(size: 11))
                         .foregroundStyle(.secondary)
-                        .lineLimit(1)
+                        // Subtitle strings like "Google AI Ultra (5x) · $100/mo
+                        // · Renews on 5th, but ↓ $50/mo plan then (1x ..." run
+                        // past 60+ chars; clipping at one line turns the price
+                        // and renewal hint into "..." before the owner can read
+                        // them.  Two lines plus tail truncation keeps the lead
+                        // visible and shortens the tail cleanly.
+                        .lineLimit(2)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .truncationMode(.tail)
                 }
             }
             Spacer(minLength: 6)
@@ -488,13 +500,20 @@ struct QuotaRow: View {
                     .foregroundStyle(.secondary)
             }
             if !compact {
-                HStack {
+                HStack(spacing: 6) {
                     Text(snapshot.observedAt.map { "Updated \($0.formatted(date: .omitted, time: .shortened))" }
                          ?? "update time unavailable")
-                    Spacer()
+                        .lineLimit(1)
+                        .truncationMode(.tail)
+                    Spacer(minLength: 6)
                     if snapshot.observedAt == nil { Text("not reported") }
                     else if snapshot.isStale { Text("stale").foregroundStyle(Theme.warning) }
-                    else if let source = snapshot.window.source { Text(source).lineLimit(1) }
+                    else if let source = snapshot.window.source {
+                        Text(source)
+                            .lineLimit(1)
+                            .truncationMode(.tail)
+                            .foregroundStyle(.tertiary)
+                    }
                 }
                 .font(.system(size: 10))
                 .foregroundStyle(.tertiary)

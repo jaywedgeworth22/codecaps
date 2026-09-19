@@ -195,6 +195,12 @@ struct ConsoleView: View {
             Text(pageTitle)
                 .font(.system(size: 20, weight: .semibold, design: .rounded))
                 .lineLimit(1)
+                // Without layout priority the title loses its space to the
+                // fixed-width controls on the right and gets truncated in the
+                // middle by default.  Tail truncation plus priority keeps the
+                // start of "Antigravity · Gemini · Claude & GPT" legible.
+                .layoutPriority(1)
+                .truncationMode(.tail)
             Spacer(minLength: 8)
             if !state.page.isSettings {
                 Picker("Layout", selection: $model.viewLayout) {
