@@ -165,6 +165,27 @@ final class MonitorModel: ObservableObject {
     /// Where each provider's windows came from on the last refresh.
     @Published private(set) var originByProvider: [String: QuotaOrigin] = [:]
 
+    /// Per-provider source ranking.  Each value is the ordered list of source
+    /// IDs the owner wants to consider for that providerKey, highest priority
+    /// first.  A source that has never been seen stays out of the list until
+    /// it has produced at least one window.  Persisted as a JSON map so new
+    /// providers land on the default (insertion order = observed order).
+    @Published var sourceRank: [String: [String]] {
+        didSet {
+            if let data = try? JSONEncoder().encode(sourceRank) {
+                defaults.set(data, forKey: "sourceRank")
+            }
+        }
+    }
+    /// Source IDs the owner has turned off, across every provider.  Disabled
+    /// windows are dropped from `freshWindows`, the menu bar, the Console
+    /// cards, and the Glance popover — they are still observed, so an owner
+    /// who re-enables a source gets its windows back on the next refresh
+    /// without re-pairing.
+    @Published var disabledSources: Set<String> {
+        didSet { defaults.set(Array(disabledSources), forKey: "disabledSources") }
+    }
+
     private let defaults: UserDefaults
     private var localWindows: [QuotaWindow] = []
     private var serverWindows: [QuotaWindow] = []
@@ -195,6 +216,13 @@ final class MonitorModel: ObservableObject {
             markStyles = [:]
         }
         customMarkPaths = (defaults.dictionary(forKey: "customMarkPaths") as? [String: String]) ?? [:]
+        if let rankData = defaults.data(forKey: "sourceRank"),
+           let decoded = try? JSONDecoder().decode([String: [String]].self, from: rankData) {
+            sourceRank = decoded
+        } else {
+            sourceRank = [:]
+        }
+        disabledSources = Set((defaults.stringArray(forKey: "disabledSources") ?? []))
         localEnabled = defaults.object(forKey: "localEnabled") as? Bool ?? true
         serverEnabled = defaults.bool(forKey: "serverEnabled")
         hasSavedToken = defaults.bool(forKey: "hasSavedToken")
@@ -241,10 +269,24 @@ final class MonitorModel: ObservableObject {
 
     var freshWindows: [QuotaWindowSnapshot] {
         let masked = maskedWindowIds
-        return sections.flatMap(\.windows).filter {
+        let visible = sections.flatMap(\.windows).filter {
             $0.isFresh && $0.remainingPercent != nil && !$0.window.isSupplementaryVideoQuota
                 && !masked.contains($0.window.id)
                 && issues[$0.window.canonicalProviderKey] == nil
+                && !disabledSources.contains($0.window.source ?? "")
+        }
+        // Order by provider rank, then by source rank within the provider, so
+        // the menu bar, Glance, and Console cards all see the same preferred
+        // window for a given provider and never disagree on the picked value.
+        let rankByProvider = sourceRank
+        return visible.sorted { lhs, rhs in
+            let lProvider = lhs.window.canonicalProviderKey
+            let rProvider = rhs.window.canonicalProviderKey
+            let lSourceRank = rankByProvider[lProvider]?.firstIndex(of: lhs.window.source ?? "") ?? Int.max
+            let rSourceRank = rankByProvider[rProvider]?.firstIndex(of: rhs.window.source ?? "") ?? Int.max
+            if lProvider != rProvider { return lProvider < rProvider }
+            if lSourceRank != rSourceRank { return lSourceRank < rSourceRank }
+            return lhs.observedAt ?? .distantPast > rhs.observedAt ?? .distantPast
         }
     }
     var reportingCount: Int { Set(freshWindows.map { $0.window.canonicalProviderKey }).count }
@@ -286,14 +328,43 @@ final class MonitorModel: ObservableObject {
     var menuBarTargetSnapshot: QuotaWindowSnapshot? {
         switch menuBarQuotaSelection {
         case "auto_lowest_active":
+            // Prefer the highest-ranked fresh window from a provider that has
+            // any non-zero quota; this is what "auto" means once the owner has
+            // ranked sources.  The pre-rank behaviour (lowest % across all
+            // windows) is preserved by the fallback when no rank is set.
             let nonZero = freshWindows.filter { ($0.remainingPercent ?? 0) > 0 }
-            return (nonZero.isEmpty ? freshWindows : nonZero)
-                .min(by: { ($0.remainingPercent ?? 100) < ($1.remainingPercent ?? 100) })
+            let pool = nonZero.isEmpty ? freshWindows : nonZero
+            return pickMenuBarTarget(from: pool)
         case "auto_lowest":
-            return freshWindows.min(by: { ($0.remainingPercent ?? 100) < ($1.remainingPercent ?? 100) })
+            return pickMenuBarTarget(from: freshWindows)
         default:
-            return freshWindows.first { $0.window.id == menuBarQuotaSelection }
-                ?? freshWindows.min(by: { ($0.remainingPercent ?? 100) < ($1.remainingPercent ?? 100) })
+            // An explicit pin is honoured regardless of rank — the owner asked
+            // for this specific window and we do not second-guess.
+            if let pinned = freshWindows.first(where: { $0.window.id == menuBarQuotaSelection }) {
+                return pinned
+            }
+            return pickMenuBarTarget(from: freshWindows)
+        }
+    }
+
+    /// Pick the menu-bar target from `pool` by lowest remaining percent.
+    /// When the owner has ranked sources, the comparison uses the rank to
+    /// break a tie so two windows with the same percentage prefer the
+    /// higher-ranked source.
+    private func pickMenuBarTarget(from pool: [QuotaWindowSnapshot]) -> QuotaWindowSnapshot? {
+        guard !pool.isEmpty else { return nil }
+        return pool.min { lhs, rhs in
+            let lPct = lhs.remainingPercent ?? 100
+            let rPct = rhs.remainingPercent ?? 100
+            if lPct != rPct { return lPct < rPct }
+            // Tie-break by rank within the same provider.
+            if lhs.window.canonicalProviderKey == rhs.window.canonicalProviderKey {
+                let rank = sourceRank[lhs.window.canonicalProviderKey] ?? []
+                let lRank = rank.firstIndex(of: lhs.window.source ?? "") ?? Int.max
+                let rRank = rank.firstIndex(of: rhs.window.source ?? "") ?? Int.max
+                if lRank != rRank { return lRank < rRank }
+            }
+            return lhs.observedAt ?? .distantPast > rhs.observedAt ?? .distantPast
         }
     }
 
@@ -301,6 +372,103 @@ final class MonitorModel: ObservableObject {
         guard menuBarStyle != .symbolOnly else { return "" }
         guard let target = menuBarTargetSnapshot, let pct = target.remainingPercent else { return "—" }
         return "\(Int(pct.rounded()))%"
+    }
+
+    // MARK: - Source ranking
+
+    /// The distinct source IDs observed on the most recent refresh for
+    /// `providerKey`, in the order the owner has them ranked.  Sources that
+    /// have never been ranked land at the tail in their natural order so a
+    /// fresh reader is visible the first time it reports.  Windows without a
+    /// source string (the field is optional on the wire) are filtered out —
+    /// there is nothing to toggle or rank against an empty identifier.
+    func availableSources(for providerKey: String) -> [String] {
+        let observed = sections.flatMap { $0.windows }
+            .filter { $0.window.canonicalProviderKey == providerKey }
+            .compactMap { $0.window.source?.isEmpty == false ? $0.window.source : nil }
+            .reduce(into: [String]()) { acc, source in
+                if !acc.contains(source) { acc.append(source) }
+            }
+        let ranked = sourceRank[providerKey] ?? []
+        let rankIndex = Dictionary(uniqueKeysWithValues: ranked.enumerated().map { ($1, $0) })
+        return observed.sorted { lhs, rhs in
+            switch (rankIndex[lhs], rankIndex[rhs]) {
+            case let (l?, r?): return l < r
+            case (_?, nil):    return true
+            case (nil, _?):    return false
+            case (nil, nil):   return lhs < rhs
+            }
+        }
+    }
+
+    /// Windows for `providerKey` with disabled sources dropped and the rest
+    /// sorted by rank.  Unranked sources keep their observed order.  Used by
+    /// both the Console cards and the menu-bar target picker so the two
+    /// surfaces never disagree on which source a number came from.
+    func orderedWindows(for providerKey: String) -> [QuotaWindowSnapshot] {
+        let all = sections.flatMap { $0.windows }.filter { $0.window.canonicalProviderKey == providerKey }
+        let visible = all.filter { snapshot in
+            guard let source = snapshot.window.source, !source.isEmpty else { return false }
+            return !disabledSources.contains(source)
+        }
+        let ranked = sourceRank[providerKey] ?? []
+        let rankIndex = Dictionary(uniqueKeysWithValues: ranked.enumerated().map { ($1, $0) })
+        return visible.sorted { lhs, rhs in
+            let lSource = lhs.window.source ?? ""
+            let rSource = rhs.window.source ?? ""
+            switch (rankIndex[lSource], rankIndex[rSource]) {
+            case let (l?, r?): return l < r
+            case (_?, nil):    return true
+            case (nil, _?):    return false
+            case (nil, nil):
+                return lhs.observedAt ?? .distantPast > rhs.observedAt ?? .distantPast
+            }
+        }
+    }
+
+    /// Persist a fresh ranking for `providerKey`.  Sources not in the new
+    /// order are appended at the tail so reordering never drops a source the
+    /// owner is still using.
+    func setSourceRank(_ rank: [String], for providerKey: String) {
+        let key = providerKey.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        let known = Set(availableSources(for: key))
+        let head = rank.filter { known.contains($0) }
+        let tail = known.subtracting(head)
+        let merged = head + Array(tail).sorted()
+        guard sourceRank[key] != merged else { return }
+        sourceRank[key] = merged
+    }
+
+    func moveSource(_ source: String, by delta: Int, for providerKey: String) {
+        let key = providerKey.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        var current = sourceRank[key] ?? availableSources(for: key)
+        guard let idx = current.firstIndex(of: source) else { return }
+        let target = idx + delta
+        guard target >= 0 && target < current.count else { return }
+        current.swapAt(idx, target)
+        sourceRank[key] = current
+    }
+
+    func setSourceEnabled(_ enabled: Bool, _ source: String, for providerKey: String) {
+        var disabled = disabledSources
+        if enabled { disabled.remove(source) } else { disabled.insert(source) }
+        guard disabled != disabledSources else { return }
+        disabledSources = disabled
+        _ = providerKey // source keys are global; providerKey is for future per-provider disable
+    }
+
+    // MARK: - Test injection
+    //
+    // The reader pipeline is async and platform-bound.  Tests that need a
+    // known set of windows inject through this seam so the rank/filter logic
+    // can be exercised in isolation.
+
+    func injectForTests(sections: [QuotaPlatformSection], now: Date = Date()) {
+        self.response = QuotaResponse(
+            generatedAt: ISO8601DateFormatter().string(from: now),
+            windows: sections.flatMap { $0.windows.map(\.window) }
+        )
+        self.now = now
     }
 
     var menuBarDetail: String {
