@@ -11,7 +11,9 @@ External integrations: BotFleet on-disk handoff at
 endpoint (v2 ingest), and an HTTP pull endpoint.
 
 Numbering continues from the prior audit batches.  The previous audits (#4–#8)
-shipped in PR #18.
+shipped in PR #18.  Umbrella GH issue:
+[#19](https://github.com/jaywedgeworth22/codecaps/issues/19).  Board item
+filed under app `codecaps`, kind `github-issue`.
 
 ---
 
@@ -23,22 +25,22 @@ shipped in PR #18.
   2026-09-19.  The user-visible copy and the default disagree.  **Fix:** rewrite
   the footer to match the new default.
 
-- **A9-02 — `notarytool` log lines redirect to fd 2 instead of fd 1.**
-  `script/build_and_run.sh:460` and `:462` both write `2>&2 | tee -a "$LOG"`,
-  which sends the pipeline output to fd 2 (stderr's stderr), so the log line
-  is silently dropped.  **Fix:** `2>&1 | tee -a "$LOG"`.
+- **A9-02 — `notarytool log` output is discarded.**
+  `script/build_and_run.sh:462` writes
+  `xcrun notarytool log "$submission" ... >&2 2>/dev/null || true` —
+  `>&2` (stdout → stderr) immediately followed by `2>/dev/null` (stderr
+  → dev/null) sends the rejection log to the bit bucket.  The user sees
+  "notarization was not accepted" but never sees the rule Apple rejected.
+  **Fix:** drop `>&2 2>/dev/null`, e.g. `>&2` (correctly, stderr-only) or
+  `2>&1 | tee -a "$LOG"`.
 
-- **A9-03 — `--deep` codesign fallback contradicts the documented policy.**
-  `script/build_and_run.sh:199-201` uses `codesign --force --deep` when no
-  identity is configured.  The comment at `:150-152` says production never uses
-  `--deep`.  **Fix:** remove `--deep` from the fallback, and tighten the
-  policy comment.
-
-- **A9-04 — `notarytool submit` exit status is not checked before stapling.**
-  `script/build_and_run.sh:460-468` runs `xcrun notarytool submit ...` and
-  immediately follows with `xcrun stapler staple`.  If the submit fails, the
-  script proceeds to staple a non-notarized bundle.  **Fix:** capture the exit
-  status and short-circuit before the staple step.
+- **A9-03 — `--deep` codesign ad-hoc fallback is undocumented.**
+  `script/build_and_run.sh:198-200` uses `codesign --force --deep --sign -`
+  when no identity is configured.  The policy comment at `:150-152` says
+  nested code is signed before its container to replace `--deep`, but does
+  not call out that the ad-hoc fallback still uses `--deep`.  **Fix:** add a
+  comment at the fallback explaining why `--deep` is OK there (signing the
+  whole bundle in one shot, no nested signing without an identity).
 
 - **A9-05 — `LocalQuotaReader.readGrok` only finds `key` in the outer dict.**
   `Sources/QuotaCore/LocalQuotaReader.swift:172-194` uses a
@@ -187,13 +189,18 @@ Implement the safe, high-value fixes that do not touch wire formats or require
 owner decision:
 
 1. A9-01 — Rewrite the stale footer in SettingsViews.swift:734.
-2. A9-02 — Fix the `2>&2` typo in build_and_run.sh.
-3. A9-03 — Remove `--deep` from the codesign fallback and update the policy
-   comment.
-4. A9-04 — Capture `notarytool submit`'s exit status and short-circuit before
-   staple.
-5. A9-13/27/28 — Add `AGENTS.md` and `EFFORT-LOG.md`.
-6. A9-23 — Add a one-line "Logs" pointer to README.
+2. A9-02 — Drop `>&2 2>/dev/null` from build_and_run.sh:462 so the rejection
+   log reaches the user.
+3. A9-03 — Add a comment to the `--deep` fallback at build_and_run.sh:198
+   explaining why it's the one path that uses it.
+4. A9-13/27/28 — Add `AGENTS.md` and `EFFORT-LOG.md`.
+5. A9-23 — Add a one-line "Logs" pointer to README.
+
+**A9-04 was retracted after the script was re-read.**  `notarize_file`
+already checks both `submit`'s exit status (`:451`) and the returned JSON
+status (`:460`), and `exit 1` short-circuits before the caller staples.  The
+rejection path is correct; only the rejection-log visibility (A9-02) was
+broken.
 
 The remaining items (A9-05 through A9-22, A9-24 through A9-26, A9-29) are
 queued for the next lane(s).  A9-14 and A9-15 require an owner call before
