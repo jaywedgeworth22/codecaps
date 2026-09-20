@@ -11,6 +11,7 @@ enum ConsolePage: Hashable {
     case settingsPlatforms
     case settingsLogoStyle
     case settingsSourcesFleet
+    case settingsNotifications
     case settingsAppearance
     case settingsAbout
 
@@ -29,6 +30,7 @@ enum ConsolePage: Hashable {
         case .settingsPlatforms: return "settingsPlatforms"
         case .settingsLogoStyle: return "settingsLogoStyle"
         case .settingsSourcesFleet: return "settingsSourcesFleet"
+        case .settingsNotifications: return "settingsNotifications"
         case .settingsAppearance: return "settingsAppearance"
         case .settingsAbout: return "settingsAbout"
         }
@@ -41,6 +43,7 @@ enum ConsolePage: Hashable {
         case "settingsPlatforms": return .settingsPlatforms
         case "settingsLogoStyle": return .settingsLogoStyle
         case "settingsSourcesFleet": return .settingsSourcesFleet
+        case "settingsNotifications": return .settingsNotifications
         case "settingsAppearance": return .settingsAppearance
         case "settingsAbout": return .settingsAbout
         default:
@@ -56,6 +59,7 @@ enum ConsolePage: Hashable {
         case .settingsPlatforms: return "Platforms"
         case .settingsLogoStyle: return "Logo Style"
         case .settingsSourcesFleet: return "Sources & Fleet"
+        case .settingsNotifications: return "Alerts & Alarms"
         case .settingsAppearance: return "Appearance"
         case .settingsAbout: return "About"
         default: return "CodeCaps"
@@ -68,6 +72,7 @@ enum ConsolePage: Hashable {
         case .settingsPlatforms: return "square.grid.2x2"
         case .settingsLogoStyle: return "photo.on.rectangle.angled"
         case .settingsSourcesFleet: return "arrow.up.arrow.down.circle"
+        case .settingsNotifications: return "bell.badge"
         case .settingsAppearance: return "circle.lefthalf.filled"
         case .settingsAbout: return "info.circle"
         default: return "square.grid.2x2"
@@ -75,7 +80,7 @@ enum ConsolePage: Hashable {
     }
 
     static let settingsPages: [ConsolePage] = [
-        .settingsMenuBar, .settingsPlatforms, .settingsLogoStyle, .settingsSourcesFleet, .settingsAppearance, .settingsAbout,
+        .settingsMenuBar, .settingsPlatforms, .settingsLogoStyle, .settingsSourcesFleet, .settingsNotifications, .settingsAppearance, .settingsAbout,
     ]
 }
 
@@ -171,6 +176,8 @@ struct ConsoleView: View {
                     SettingsLogoStylePage(model: model)
                 case .settingsSourcesFleet:
                     SettingsSourcesFleetPage(model: model)
+                case .settingsNotifications:
+                    SettingsNotificationsPage(model: model)
                 case .settingsAppearance:
                     SettingsAppearancePage(model: model)
                 case .settingsAbout:
@@ -339,6 +346,12 @@ struct ConsoleSidebar: View {
                 }
             }
             Spacer(minLength: 2)
+            if model.isAlarmArmed(for: row.id) {
+                Image(systemName: "bell.fill")
+                    .font(.system(size: 10))
+                    .foregroundStyle(Theme.accent)
+                    .accessibilityLabel("Reset alarm armed")
+            }
             if model.issues[row.providerKey] != nil {
                 Image(systemName: "exclamationmark.circle")
                     .font(.system(size: 11))
@@ -567,6 +580,8 @@ struct AllPlatformsPage: View {
                      origin: origin,
                      customInfo: model.platformCustomInfo[row.providerKey],
                      markStyle: model.markStyle(for: row.providerKey),
+                     isAlarmArmed: model.isAlarmArmed(for: row.id),
+                     onToggleAlarm: { model.toggleAlarm(for: row.id) },
                      onOpenSettings: model.consentNeeded.contains(row.providerKey)
                         ? { state.page = .settingsSourcesFleet } : nil)
     }
@@ -612,6 +627,8 @@ struct PlatformDetailPage: View {
                              origin: model.originByProvider[row.providerKey] ?? .local,
                              customInfo: model.platformCustomInfo[row.providerKey],
                              markStyle: model.markStyle(for: row.providerKey),
+                             isAlarmArmed: model.isAlarmArmed(for: row.id),
+                             onToggleAlarm: { model.toggleAlarm(for: row.id) },
                              onOpenSettings: model.consentNeeded.contains(row.providerKey)
                                 ? { state.page = .settingsSourcesFleet } : nil)
             } else {
