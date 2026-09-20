@@ -196,7 +196,10 @@ sign_app_bundle() {
   fi
   adhoc_warning
   # The hardened-runtime and timestamp options belong to a real identity, so the
-  # fallback drops them and signs the bundle whole.
+  # fallback drops them and signs the bundle whole.  --deep is fine here —
+  # this is the ad-hoc path with no real identity to chain nested code under,
+  # and signing everything once with the bundle's own options is the only
+  # workable shape.
   /usr/bin/codesign --force --deep --sign - "$APP_BUNDLE"
   describe_signature
 }
@@ -459,7 +462,7 @@ notarize_file() {
   echo "notarization status: $status"
   if [[ "$status" != "Accepted" ]]; then
     echo "notarization was not accepted for $(basename "$file").  Apple's log follows." >&2
-    xcrun notarytool log "$submission" --keychain-profile "$NOTARY_PROFILE" >&2 2>/dev/null || true
+    xcrun notarytool log "$submission" --keychain-profile "$NOTARY_PROFILE" >&2 || true
     exit 1
   fi
 }

@@ -731,7 +731,7 @@ struct SettingsAppearancePage: View {
                 .help("Theme")
                 .accessibilityLabel("Theme")
             } footer: {
-                Text("Light is the default." + sentenceGap + "System follows your Mac's setting.")
+                Text("System is the default." + sentenceGap + "Light and Dark ignore your Mac's setting.")
                     .font(.system(size: 11))
                     .foregroundStyle(.secondary)
             }
