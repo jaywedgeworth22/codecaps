@@ -1,0 +1,44 @@
+# CodeCaps — Effort Log
+
+Running log of work units, newest first.  Each entry: date, lane, summary,
+PR (when shipped), follow-ups (when parked).
+
+---
+
+## 2026-09-20 — Comprehensive audit, tier-1 implementation
+
+Lane: `mm/audit-2026-09-20`.  Audit: `docs/audits/2026-09-20-comprehensive.md`.
+GitHub umbrella: [#19](https://github.com/jaywedgeworth22/codecaps/issues/19).
+
+Swept every Swift file in `Sources/CodeCaps/` and `Sources/QuotaCore/`, the
+build script, the tests, the README.  22 findings (5 high, 7 medium, 10 low)
+plus 6 test/doc gaps.
+
+Tier-1 implementation in this PR:
+
+- A9-01 — SettingsViews.swift:734 footer copy updated to match the System
+  default from commit `3b24eb8`.
+- A9-02 — `script/build_and_run.sh:462` no longer discards the notarization
+  rejection log (`>&2 2>/dev/null` → `>&2`).
+- A9-03 — `script/build_and_run.sh:198-200` carries a comment explaining
+  why `--deep` is fine in the ad-hoc fallback only.
+- A9-13/27/28 — `AGENTS.md` and `EFFORT-LOG.md` added.
+- A9-23 — README "Logs" section added.
+
+A9-04 retracted after re-read (script already exits 1 on rejection before
+stapling).
+
+Queued for follow-up lanes: A9-05, A9-06, A9-07, A9-08, A9-09, A9-10, A9-11,
+A9-12, A9-16, A9-17, A9-18, A9-24, A9-25, A9-26, A9-29.  A9-14 and A9-15
+(producer rename) deferred — wire format, needs owner call.
+
+## 2026-09-19 — Default appearance to System (PR #18, audits #4–#8)
+
+Lane: `mm/system-default-theme`.  Five audit-batch fixes landed with the
+theme-default change:
+
+- audit #4 — `DisplaySection.driving` determinism (ff...f3).
+- audit #5 — Antigravity RPC short-circuit on 4xx (7eb8202).
+- audit #6 — `PlatformDetailPage` save debounce 250ms (2151862).
+- audit #7 — Glance consent-needed row rendering (36757fc).
+- audit #8 — Dynamic Type on body copy (bd10335).

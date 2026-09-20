@@ -176,7 +176,7 @@ Console's sidebar has five Settings pages.
 - **Menu Bar** — where the icon shows (menu bar, Dock, or both), plus its Displayed Quota picker (above).
 - **Platforms** — platform list order, shared by Glance, Console, and the menu bar.
 - **Sources & Fleet** — three groups: **This Mac** (readers on/off, one status row per platform), **Share This Mac** (push: Ingest Endpoint, Ingest Token, Payload Format, Save & Push Now), **Pull The Fleet** (pull: Quota Endpoint, Read Token, Save & Fetch Now).  Both fleet groups also offer Forget Token and, only when a saved token can't be read back, Re-Authorize Saved Token.
-- **Appearance** — Light, Dark, or System; Light is default.
+- **Appearance** — Light, Dark, or System; System follows your Mac's setting and is the default.
 - **About** — version, push/pull/local-reader status, and a project page link.
 
 <img src="docs/screenshots/settings-sources-fleet.png" width="760" alt="Sources and Fleet">
@@ -201,6 +201,13 @@ swift test
 ```
 
 See `AGENTBAR_BUNDLE_ID` above when building from more than one checkout at once.
+
+## Logs
+
+Build and notarization output goes to `$TMPDIR/CodeCaps-build-<pid>.log` (one
+per run).  The app itself does not log to a file by default — Console.app →
+"CodeCaps" is the place to look for menu / popover diagnostics, and
+`log show --process CodeCaps --last 1h` for anything deeper.
 
 ## License
 
