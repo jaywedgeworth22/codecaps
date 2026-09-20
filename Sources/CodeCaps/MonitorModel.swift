@@ -186,6 +186,8 @@ final class MonitorModel: ObservableObject {
         didSet { defaults.set(Array(disabledSources), forKey: "disabledSources") }
     }
 
+    public let alarmManager: ResetAlarmManager
+
     private let defaults: UserDefaults
     private var localWindows: [QuotaWindow] = []
     private var serverWindows: [QuotaWindow] = []
@@ -232,6 +234,8 @@ final class MonitorModel: ObservableObject {
         endpoint = defaults.string(forKey: "endpoint") ?? ""
         syncEndpoint = defaults.string(forKey: "syncEndpoint") ?? ""
         syncFormat = QuotaSyncFormat(rawValue: defaults.string(forKey: "syncFormat") ?? "") ?? .usageMonitorV2
+
+        alarmManager = ResetAlarmManager(defaults: defaults)
 
         appearance = AppAppearance(rawValue: defaults.string(forKey: "appearance") ?? "") ?? .system
         keepConsoleInFront = defaults.bool(forKey: "consoleKeepInFront")
@@ -480,13 +484,50 @@ final class MonitorModel: ObservableObject {
         return "\(title), \(windowCadenceName(target.window)): \(pct) remaining"
     }
 
+    // MARK: - Reset Alarms
+
+    var notifyOnReset: Bool {
+        get { alarmManager.notifyOnReset }
+        set {
+            alarmManager.notifyOnReset = newValue
+            objectWillChange.send()
+        }
+    }
+
+    var soundOnReset: Bool {
+        get { alarmManager.soundOnReset }
+        set {
+            alarmManager.soundOnReset = newValue
+            objectWillChange.send()
+        }
+    }
+
+    func isAlarmArmed(for sectionId: String) -> Bool {
+        alarmManager.isAlarmArmed(for: sectionId)
+    }
+
+    func toggleAlarm(for sectionId: String) {
+        alarmManager.toggleAlarm(for: sectionId)
+        objectWillChange.send()
+    }
+
     func start() {
         refresh()
         refreshTimer = Timer.scheduledTimer(withTimeInterval: 300, repeats: true) { [weak self] _ in
             Task { @MainActor in self?.refresh() }
         }
         clockTimer = Timer.scheduledTimer(withTimeInterval: 30, repeats: true) { [weak self] _ in
-            Task { @MainActor in self?.now = Date() }
+            Task { @MainActor in
+                guard let self else { return }
+                self.now = Date()
+                let pendingReset = self.displaySections.contains {
+                    (self.alarmManager.isAlarmArmed(for: $0.id) || self.alarmManager.isSectionExhausted($0))
+                        && ($0.resetAt != nil && $0.resetAt! <= self.now)
+                }
+                if pendingReset {
+                    self.refresh()
+                }
+            }
         }
     }
 
@@ -918,6 +959,7 @@ final class MonitorModel: ObservableObject {
             self.originByProvider = origins
             if newServer != nil { self.lastPullTime = self.now }
             self.response = QuotaResponse(generatedAt: ISO8601DateFormatter().string(from: self.now), windows: merged)
+            self.alarmManager.evaluate(currentSections: self.displaySections, now: self.now)
             self.isRefreshing = false
             self.request = nil
         }

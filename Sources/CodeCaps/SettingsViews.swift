@@ -835,7 +835,7 @@ struct SettingsLogoStylePage: View {
         panel.allowsMultipleSelection = false
         panel.canChooseDirectories = false
         if panel.runModal() == .OK, let url = panel.url {
-            model.setCustomMark(at: url, for: providerKey)
+            _ = model.setCustomMark(at: url, for: providerKey)
         }
     }
 }
@@ -896,6 +896,41 @@ struct SettingsAboutPage: View {
                     .font(.system(size: 11))
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+    }
+}
+
+// MARK: - Notifications & Alarms
+
+struct SettingsNotificationsPage: View {
+    @ObservedObject var model: MonitorModel
+
+    var body: some View {
+        SettingsPage {
+            Section {
+                Toggle("Notify When Quota Resets", isOn: $model.notifyOnReset)
+                Toggle("Play Alert Sound", isOn: $model.soundOnReset)
+            } header: {
+                Eyebrow("RESET ALERTS")
+            } footer: {
+                Text("CodeCaps alerts you when an exhausted model or pool resets and can be used once again." + sentenceGap
+                     + "If another quota or cap is still in effect (such as an exhausted weekly cap), the alert is suppressed until all controlling limits are cleared.")
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            Section {
+                Button("Send Test Notification") {
+                    model.alarmManager.sendTestNotification()
+                }
+                .help("Send Test Notification")
+                .accessibilityLabel("Send Test Notification")
+            } footer: {
+                Text("Triggers a test notification and alert sound to confirm macOS Notification permissions.")
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
             }
         }
     }

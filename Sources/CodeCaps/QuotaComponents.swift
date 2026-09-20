@@ -272,6 +272,8 @@ struct PlatformCard: View {
     var origin: QuotaOrigin = .local
     var customInfo: PlatformCustomInfo? = nil
     var markStyle: MarkStyle = .template
+    var isAlarmArmed: Bool = false
+    var onToggleAlarm: (() -> Void)? = nil
     /// Set only when the issue is one the owner can actually fix in Settings —
     /// today, the one-time Allow Access To Claude Code step.  The card then
     /// carries the same deep link the fleet banner uses.
@@ -351,6 +353,18 @@ struct PlatformCard: View {
                 }
             }
             Spacer(minLength: 6)
+            if let onToggleAlarm {
+                Button {
+                    onToggleAlarm()
+                } label: {
+                    Image(systemName: isAlarmArmed ? "bell.fill" : "bell")
+                        .font(.system(size: compact ? 12 : 14))
+                        .foregroundStyle(isAlarmArmed ? Theme.accent : .secondary)
+                }
+                .buttonStyle(.plain)
+                .help(isAlarmArmed ? "Reset alarm is armed." + sentenceGap + "Click to disarm." : "Arm alarm when quota resets.")
+                .accessibilityLabel(isAlarmArmed ? "Disarm reset alarm" : "Arm reset alarm")
+            }
             if !section.windows.isEmpty { StatusBadge(kind: badge) }
         }
     }

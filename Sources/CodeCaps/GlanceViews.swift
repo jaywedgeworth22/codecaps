@@ -73,7 +73,9 @@ struct GlancePopover: View {
                           now: model.now,
                           issue: model.issues[row.providerKey],
                           origin: .local,
-                          markStyle: model.markStyle(for: row.providerKey))
+                          markStyle: model.markStyle(for: row.providerKey),
+                          isAlarmArmed: model.isAlarmArmed(for: row.id),
+                          onToggleAlarm: { model.toggleAlarm(for: row.id) })
             }
             if !fleetGroups.isEmpty {
                 Spacer().frame(height: 12)
@@ -90,7 +92,9 @@ struct GlancePopover: View {
                                           now: model.now,
                                           issue: nil,
                                           origin: .fleet,
-                                          markStyle: model.markStyle(for: row.providerKey))
+                                          markStyle: model.markStyle(for: row.providerKey),
+                                          isAlarmArmed: model.isAlarmArmed(for: row.id),
+                                          onToggleAlarm: { model.toggleAlarm(for: row.id) })
                             }
                         }
                     }
@@ -196,6 +200,8 @@ struct GlanceRow: View {
     let issue: String?
     let origin: QuotaOrigin
     let markStyle: MarkStyle
+    var isAlarmArmed: Bool = false
+    var onToggleAlarm: (() -> Void)? = nil
 
     private var section: QuotaPlatformSection { row.section }
 
@@ -287,14 +293,39 @@ struct GlanceRow: View {
 
     @ViewBuilder
     private var trailingColumn: some View {
-        VStack(alignment: .trailing, spacing: 2) {
-            Text(trailingText)
-                .font(.system(size: 11))
-                .foregroundStyle(.secondary)
-                .lineLimit(1)
-                .truncationMode(.tail)
-            if origin == .fleet {
-                StatusBadge(kind: .fleet)
+        HStack(spacing: 4) {
+            if isAlarmArmed {
+                Button {
+                    onToggleAlarm?()
+                } label: {
+                    Image(systemName: "bell.fill")
+                        .font(.system(size: 10))
+                        .foregroundStyle(Theme.accent)
+                }
+                .buttonStyle(.plain)
+                .help("Reset alarm is armed." + sentenceGap + "Click to disarm.")
+                .accessibilityLabel("Disarm reset alarm")
+            } else if (percent != nil && percent! <= 0) && onToggleAlarm != nil {
+                Button {
+                    onToggleAlarm?()
+                } label: {
+                    Image(systemName: "bell")
+                        .font(.system(size: 10))
+                        .foregroundStyle(.secondary)
+                }
+                .buttonStyle(.plain)
+                .help("Arm alarm when quota resets and all caps clear.")
+                .accessibilityLabel("Arm reset alarm")
+            }
+            VStack(alignment: .trailing, spacing: 2) {
+                Text(trailingText)
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+                if origin == .fleet {
+                    StatusBadge(kind: .fleet)
+                }
             }
         }
     }
