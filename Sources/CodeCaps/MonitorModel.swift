@@ -566,9 +566,21 @@ final class MonitorModel: ObservableObject {
 
     /// The mark style for a provider.  Unknown keys return `.template`, which
     /// matches the pre-picker default of every shipped mark.
+    /// The mark style for the menu bar status item.  Template (monochrome)
+    /// by default so the icon inverts cleanly against light and dark menu bar
+    /// surfaces.  Owners who want brand colour can override per-provider in
+    /// Settings → Logo Style.
     func markStyle(for providerKey: String) -> MarkStyle {
         let key = providerKey.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
         return markStyles[key] ?? .template
+    }
+
+    /// The mark style for the glance popover.  `standard` (colour) by
+    /// default — the popover sits on the system surface, not the menu bar,
+    /// so the brand colours read better than a monochrome silhouette.
+    func glanceMarkStyle(for providerKey: String) -> MarkStyle {
+        let key = providerKey.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        return markStyles[key] ?? .standard
     }
 
     func setMarkStyle(_ style: MarkStyle, for providerKey: String) {

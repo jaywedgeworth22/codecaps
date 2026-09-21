@@ -73,7 +73,7 @@ struct GlancePopover: View {
                           now: model.now,
                           issue: model.issues[row.providerKey],
                           origin: .local,
-                          markStyle: model.markStyle(for: row.providerKey),
+                          markStyle: model.glanceMarkStyle(for: row.providerKey),
                           isAlarmArmed: model.isAlarmArmed(for: row.id),
                           onToggleAlarm: { model.toggleAlarm(for: row.id) })
             }
@@ -92,7 +92,7 @@ struct GlancePopover: View {
                                           now: model.now,
                                           issue: nil,
                                           origin: .fleet,
-                                          markStyle: model.markStyle(for: row.providerKey),
+                                          markStyle: model.glanceMarkStyle(for: row.providerKey),
                                           isAlarmArmed: model.isAlarmArmed(for: row.id),
                                           onToggleAlarm: { model.toggleAlarm(for: row.id) })
                             }

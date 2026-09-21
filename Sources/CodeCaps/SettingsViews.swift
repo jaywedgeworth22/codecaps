@@ -710,7 +710,7 @@ struct ReaderStatus {
         ReaderStatus(providerKey: "openai", label: "Codex", source: "Codex CLI credentials"),
         ReaderStatus(providerKey: "google-antigravity", label: "Antigravity", source: "Antigravity app or CLI"),
         ReaderStatus(providerKey: "cursor", label: "Cursor", source: "Cursor app session"),
-        ReaderStatus(providerKey: "xai", label: "Grok CLI", source: "Grok CLI credentials"),
+        ReaderStatus(providerKey: "xai", label: "Grok", source: "Grok CLI credentials"),
         ReaderStatus(providerKey: "grok-bot", label: "Grok Bot", source: "Cursor app session"),
         ReaderStatus(providerKey: "minimax", label: "MiniMax", source: "MiniMax CLI credentials"),
     ]
