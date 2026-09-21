@@ -108,11 +108,12 @@ public enum PlatformLogoImage {
     ]
 
     /// Return the bundled asset for `providerKey`, or `nil` if no artwork ships.
-    /// The cache key is shared by both styles; the caller decides whether to
-    /// keep the brand color or strip it down to a template.
-    private static func bundledImage(providerKey: String) -> NSImage? {
+    /// The standard cache preserves brand colors; the template cache marks the
+    /// image as a template so it adapts to Light/Dark and menu bar selection.
+    private static func bundledImage(providerKey: String, style: MarkStyle = .template) -> NSImage? {
         let key = providerKey.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() as NSString
-        if let cached = standardCache.object(forKey: key) { return cached }
+        let cache = (style == .standard) ? standardCache : templateCache
+        if let cached = cache.object(forKey: key) { return cached }
         guard let resource = resourceNames[key as String],
               let url = Bundle.module.url(forResource: resource.name, withExtension: resource.ext)
                   ?? Bundle.module.url(
@@ -125,12 +126,17 @@ public enum PlatformLogoImage {
         }
         // Keep the brand color cached separately from the template copy.
         let colorCopy = NSImage(contentsOf: url)
-        colorCopy?.isTemplate = false
+        if (key as String) == "grok-bot" {
+            // Grok Bot is monochrome; adapt to Light and Dark mode across all styles.
+            colorCopy?.isTemplate = true
+        } else {
+            colorCopy?.isTemplate = false
+        }
         standardCache.setObject(colorCopy ?? image, forKey: key)
         let templateCopy = NSImage(contentsOf: url)
         templateCopy?.isTemplate = true
         templateCache.setObject(templateCopy ?? image, forKey: key)
-        return templateCache.object(forKey: key)
+        return cache.object(forKey: key)
     }
 
     /// Return a mark for `providerKey` honoring `style`.  Custom marks are
@@ -141,12 +147,12 @@ public enum PlatformLogoImage {
         let key = providerKey.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
         switch style {
         case .standard:
-            return bundledImage(providerKey: key)
+            return bundledImage(providerKey: key, style: .standard)
         case .template:
-            return bundledImage(providerKey: key)
+            return bundledImage(providerKey: key, style: .template)
         case .custom:
             if let custom = loadCustom(providerKey: key) { return custom }
-            return bundledImage(providerKey: key)
+            return bundledImage(providerKey: key, style: .standard)
         }
     }
 
