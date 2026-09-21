@@ -41,8 +41,15 @@ public enum LocalQuotaSnapshot {
         }
     }
 
+    public static let appGroupId = "group.com.simplewithus.codecaps"
+
     public static func destination(home: URL = FileManager.default.homeDirectoryForCurrentUser) -> URL {
         home.appendingPathComponent("Library/Application Support/Usage Monitor/quota-windows.json")
+    }
+
+    public static func appGroupDestination() -> URL? {
+        FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: appGroupId)?
+            .appendingPathComponent("quota-windows.json")
     }
 
     public static func write(
@@ -62,6 +69,12 @@ public enum LocalQuotaSnapshot {
         let data = try JSONEncoder().encode(payload)
         guard data.count <= 1_048_576 else { throw CocoaError(.fileWriteOutOfSpace) }
         try writePrivately(data, to: url, in: directory, using: manager)
+
+        if let groupDest = appGroupDestination(), groupDest != url {
+            let groupDir = groupDest.deletingLastPathComponent()
+            try? manager.createDirectory(at: groupDir, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])
+            try? writePrivately(data, to: groupDest, in: groupDir, using: manager)
+        }
     }
 
     /// Opens the temporary file at 0600 and writes the payload into that

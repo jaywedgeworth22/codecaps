@@ -34,26 +34,45 @@ public struct CompanionQuotaItem: Identifiable, Codable, Equatable {
 /// 3. Manages iOS local notifications and Apple Watch alerts when quotas reset.
 @MainActor
 public final class CompanionQuotaModel: ObservableObject {
+    public static let appGroupId = "group.com.simplewithus.codecaps"
+
+    private var sharedDefaults: UserDefaults {
+        UserDefaults(suiteName: Self.appGroupId) ?? UserDefaults.standard
+    }
+
     @Published public var items: [CompanionQuotaItem] = []
     @Published public var isRefreshing: Bool = false
     @Published public var lastUpdated: Date?
     @Published public var syncEndpoint: String {
-        didSet { UserDefaults.standard.set(syncEndpoint, forKey: "companionSyncEndpoint") }
+        didSet {
+            UserDefaults.standard.set(syncEndpoint, forKey: "companionSyncEndpoint")
+            sharedDefaults.set(syncEndpoint, forKey: "companionSyncEndpoint")
+        }
     }
     @Published public var syncToken: String {
-        didSet { UserDefaults.standard.set(syncToken, forKey: "companionSyncToken") }
+        didSet {
+            UserDefaults.standard.set(syncToken, forKey: "companionSyncToken")
+            sharedDefaults.set(syncToken, forKey: "companionSyncToken")
+        }
     }
     @Published public var notifyOnReset: Bool {
-        didSet { UserDefaults.standard.set(notifyOnReset, forKey: "companionNotifyOnReset") }
+        didSet {
+            UserDefaults.standard.set(notifyOnReset, forKey: "companionNotifyOnReset")
+            sharedDefaults.set(notifyOnReset, forKey: "companionNotifyOnReset")
+        }
     }
 
     private var previouslyExhaustedIds: Set<String> = []
     private var hasInitialized = false
 
     public init() {
-        self.syncEndpoint = UserDefaults.standard.string(forKey: "companionSyncEndpoint") ?? ""
-        self.syncToken = UserDefaults.standard.string(forKey: "companionSyncToken") ?? ""
-        self.notifyOnReset = UserDefaults.standard.object(forKey: "companionNotifyOnReset") as? Bool ?? true
+        let defaults = UserDefaults(suiteName: Self.appGroupId) ?? UserDefaults.standard
+        self.syncEndpoint = defaults.string(forKey: "companionSyncEndpoint")
+            ?? UserDefaults.standard.string(forKey: "companionSyncEndpoint") ?? ""
+        self.syncToken = defaults.string(forKey: "companionSyncToken")
+            ?? UserDefaults.standard.string(forKey: "companionSyncToken") ?? ""
+        self.notifyOnReset = defaults.object(forKey: "companionNotifyOnReset") as? Bool
+            ?? UserDefaults.standard.object(forKey: "companionNotifyOnReset") as? Bool ?? true
 
         requestNotificationPermission()
         loadLocalFallback()
@@ -174,6 +193,23 @@ public final class CompanionQuotaModel: ObservableObject {
     }
 
     private func loadLocalFallback() {
+        // First check shared App Group container
+        if let container = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: Self.appGroupId) {
+            let sharedFile = container.appendingPathComponent("quota-windows.json")
+            if let data = try? Data(contentsOf: sharedFile) {
+                parseSnapshot(data: data)
+                if !items.isEmpty { return }
+            }
+        }
+
+        // On macOS or local simulator, check user Library
+        let fallbackPath = ("~/Library/Application Support/Usage Monitor/quota-windows.json" as NSString).expandingTildeInPath
+        if FileManager.default.fileExists(atPath: fallbackPath),
+           let data = try? Data(contentsOf: URL(fileURLWithPath: fallbackPath)) {
+            parseSnapshot(data: data)
+            if !items.isEmpty { return }
+        }
+
         if items.isEmpty {
             items = [
                 CompanionQuotaItem(id: "antigravity:gemini", providerKey: "google-antigravity", title: "Antigravity · Gemini", subtitle: "5-hour pool", remainingPercent: 78, resetAt: nil, isExhausted: false, isAlarmArmed: false),
