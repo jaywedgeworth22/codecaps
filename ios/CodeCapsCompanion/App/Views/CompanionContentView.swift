@@ -22,8 +22,11 @@ public struct CompanionContentView: View {
                 .padding(.vertical, 12)
             }
             .navigationTitle("CodeCaps")
+            #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
+            #endif
             .toolbar {
+                #if os(iOS)
                 ToolbarItem(placement: .topBarTrailing) {
                     Button {
                         showingSettings = true
@@ -31,6 +34,15 @@ public struct CompanionContentView: View {
                         Image(systemName: "gearshape")
                     }
                 }
+                #else
+                ToolbarItem(placement: .primaryAction) {
+                    Button {
+                        showingSettings = true
+                    } label: {
+                        Image(systemName: "gearshape")
+                    }
+                }
+                #endif
             }
             .refreshable {
                 await model.refresh()
@@ -39,6 +51,24 @@ public struct CompanionContentView: View {
                 companionSettingsView
             }
         }
+    }
+
+    // MARK: - Colors
+
+    private var cardBackground: Color {
+        #if os(iOS)
+        return Color(uiColor: .secondarySystemBackground)
+        #else
+        return Color(nsColor: .windowBackgroundColor)
+        #endif
+    }
+
+    private var trackColor: Color {
+        #if os(iOS)
+        return Color(uiColor: .tertiarySystemFill)
+        #else
+        return Color.secondary.opacity(0.15)
+        #endif
     }
 
     // MARK: - Header Card
@@ -60,7 +90,7 @@ public struct CompanionContentView: View {
             }
         }
         .padding(14)
-        .background(Color(.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 12))
+        .background(cardBackground, in: RoundedRectangle(cornerRadius: 12))
     }
 
     // MARK: - Quota Card
@@ -98,7 +128,7 @@ public struct CompanionContentView: View {
             GeometryReader { geo in
                 ZStack(alignment: .leading) {
                     Capsule()
-                        .fill(Color(.tertiarySystemFill))
+                        .fill(trackColor)
                     if let pct = item.remainingPercent {
                         Capsule()
                             .fill(item.statusColor)
@@ -109,7 +139,7 @@ public struct CompanionContentView: View {
             .frame(height: 6)
         }
         .padding(14)
-        .background(Color(.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 14))
+        .background(cardBackground, in: RoundedRectangle(cornerRadius: 14))
     }
 
     // MARK: - Settings View
@@ -118,9 +148,14 @@ public struct CompanionContentView: View {
         NavigationStack {
             Form {
                 Section("Mac Sync Endpoint") {
+                    #if os(iOS)
                     TextField("Endpoint URL (https://...)", text: $model.syncEndpoint)
                         .textInputAutocapitalization(.never)
                         .autocorrectionDisabled(true)
+                    #else
+                    TextField("Endpoint URL (https://...)", text: $model.syncEndpoint)
+                        .autocorrectionDisabled(true)
+                    #endif
                     SecureField("Sync Bearer Token", text: $model.syncToken)
                 }
 
@@ -135,11 +170,19 @@ public struct CompanionContentView: View {
                 }
             }
             .navigationTitle("Companion Settings")
+            #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
+            #endif
             .toolbar {
+                #if os(iOS)
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Done") { showingSettings = false }
                 }
+                #else
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Done") { showingSettings = false }
+                }
+                #endif
             }
         }
     }

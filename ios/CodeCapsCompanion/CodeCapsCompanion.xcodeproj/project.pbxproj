@@ -7,16 +7,26 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		034780ECDDEB89E523E7E1B7 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = DF46F01EE0931315955EE9AF /* Assets.xcassets */; };
+		0BDDE676F287EA3372B9D24B /* CompanionQuotaModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1371DB889435F70346FB6AF /* CompanionQuotaModel.swift */; };
+		2018A85587B07653EFF5445C /* CompanionContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 84C4C2C5DC3AA20234129F15 /* CompanionContentView.swift */; };
+		2300043111EDF02526E8D53B /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = DF46F01EE0931315955EE9AF /* Assets.xcassets */; };
 		2440D143F835BAD99240BE8D /* CompanionContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 84C4C2C5DC3AA20234129F15 /* CompanionContentView.swift */; };
 		2CA370B5E2149BEA3FCB3F6C /* CodeCapsCompanionApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 34CE8BC7DF9DCF088BF1B805 /* CodeCapsCompanionApp.swift */; };
+		99A788DAEA41B4AB83A93501 /* CodeCapsCompanionApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 34CE8BC7DF9DCF088BF1B805 /* CodeCapsCompanionApp.swift */; };
 		C48D9F8052E4F39044504C84 /* CompanionQuotaModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1371DB889435F70346FB6AF /* CompanionQuotaModel.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
 		154D17A5A492536F43729222 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		34CE8BC7DF9DCF088BF1B805 /* CodeCapsCompanionApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CodeCapsCompanionApp.swift; sourceTree = "<group>"; };
+		6992E7C7086CA631814CCD87 /* CodeCapsCompanionMac.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = CodeCapsCompanionMac.entitlements; sourceTree = "<group>"; };
 		84C4C2C5DC3AA20234129F15 /* CompanionContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompanionContentView.swift; sourceTree = "<group>"; };
+		B47E0485E1902045DBFE06B1 /* CodeCapsCompanion.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = CodeCapsCompanion.entitlements; sourceTree = "<group>"; };
 		C1371DB889435F70346FB6AF /* CompanionQuotaModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompanionQuotaModel.swift; sourceTree = "<group>"; };
+		C2EA171A442F77D9348C68D4 /* InfoMac.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = InfoMac.plist; sourceTree = "<group>"; };
+		C679EF2BE96C94E938E56DC1 /* CodeCapsCompanionMac.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = CodeCapsCompanionMac.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		DF46F01EE0931315955EE9AF /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		FFD1407F089F595B7B485517 /* CodeCapsCompanion.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = CodeCapsCompanion.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
@@ -42,8 +52,11 @@
 				2616D2707F562EA07D0E6527 /* Models */,
 				1A10513D0EF01D22E9941268 /* Resources */,
 				4BE1EE20399A37860158A030 /* Views */,
+				B47E0485E1902045DBFE06B1 /* CodeCapsCompanion.entitlements */,
 				34CE8BC7DF9DCF088BF1B805 /* CodeCapsCompanionApp.swift */,
+				6992E7C7086CA631814CCD87 /* CodeCapsCompanionMac.entitlements */,
 				154D17A5A492536F43729222 /* Info.plist */,
+				C2EA171A442F77D9348C68D4 /* InfoMac.plist */,
 			);
 			path = App;
 			sourceTree = "<group>";
@@ -60,6 +73,7 @@
 			isa = PBXGroup;
 			children = (
 				2C7829A5D8BD9EF9C122A4F2 /* App */,
+				DF46F01EE0931315955EE9AF /* Assets.xcassets */,
 				C53A412A4B40988009B93D1B /* Products */,
 			);
 			sourceTree = "<group>";
@@ -68,6 +82,7 @@
 			isa = PBXGroup;
 			children = (
 				FFD1407F089F595B7B485517 /* CodeCapsCompanion.app */,
+				C679EF2BE96C94E938E56DC1 /* CodeCapsCompanionMac.app */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -80,6 +95,7 @@
 			buildConfigurationList = 2ED9EF9E6C814084B21BFF5B /* Build configuration list for PBXNativeTarget "CodeCapsCompanion" */;
 			buildPhases = (
 				5D95C7E939C75DD1BC3FB9A4 /* Sources */,
+				F6BBA5E1D41955121FAB7BDB /* Resources */,
 			);
 			buildRules = (
 			);
@@ -92,6 +108,24 @@
 			productReference = FFD1407F089F595B7B485517 /* CodeCapsCompanion.app */;
 			productType = "com.apple.product-type.application";
 		};
+		7B3804F93936EEE96F26551D /* CodeCapsCompanionMac */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = BE16BE186885ED1305D6FD08 /* Build configuration list for PBXNativeTarget "CodeCapsCompanionMac" */;
+			buildPhases = (
+				05C6704BA23A5E8CD1A8412F /* Sources */,
+				30E6F3D60263C25E6403C9E4 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = CodeCapsCompanionMac;
+			packageProductDependencies = (
+			);
+			productName = CodeCapsCompanionMac;
+			productReference = C679EF2BE96C94E938E56DC1 /* CodeCapsCompanionMac.app */;
+			productType = "com.apple.product-type.application";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -102,6 +136,11 @@
 				LastUpgradeCheck = 1600;
 				TargetAttributes = {
 					176BC6FE9533347AC12DA6E4 = {
+						DevelopmentTeam = CC8UTF7ATG;
+						ProvisioningStyle = Automatic;
+					};
+					7B3804F93936EEE96F26551D = {
+						DevelopmentTeam = CC8UTF7ATG;
 						ProvisioningStyle = Automatic;
 					};
 				};
@@ -121,11 +160,41 @@
 			projectRoot = "";
 			targets = (
 				176BC6FE9533347AC12DA6E4 /* CodeCapsCompanion */,
+				7B3804F93936EEE96F26551D /* CodeCapsCompanionMac */,
 			);
 		};
 /* End PBXProject section */
 
+/* Begin PBXResourcesBuildPhase section */
+		30E6F3D60263C25E6403C9E4 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				034780ECDDEB89E523E7E1B7 /* Assets.xcassets in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		F6BBA5E1D41955121FAB7BDB /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				2300043111EDF02526E8D53B /* Assets.xcassets in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
 /* Begin PBXSourcesBuildPhase section */
+		05C6704BA23A5E8CD1A8412F /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				99A788DAEA41B4AB83A93501 /* CodeCapsCompanionApp.swift in Sources */,
+				2018A85587B07653EFF5445C /* CompanionContentView.swift in Sources */,
+				0BDDE676F287EA3372B9D24B /* CompanionQuotaModel.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		5D95C7E939C75DD1BC3FB9A4 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -139,6 +208,50 @@
 /* End PBXSourcesBuildPhase section */
 
 /* Begin XCBuildConfiguration section */
+		2D36FA9F2E5CB4083D3F725D /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = App/CodeCapsCompanionMac.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				COMBINE_HIDPI_IMAGES = YES;
+				DEVELOPMENT_TEAM = CC8UTF7ATG;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = App/InfoMac.plist;
+				ITSAppUsesNonExemptEncryption = NO;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.simplewithus.codecaps.macos;
+				PRODUCT_NAME = CodeCaps;
+				SDKROOT = macosx;
+			};
+			name = Debug;
+		};
+		345C0A555C923F4DD7EBEE4D /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = App/CodeCapsCompanionMac.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				COMBINE_HIDPI_IMAGES = YES;
+				DEVELOPMENT_TEAM = CC8UTF7ATG;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = App/InfoMac.plist;
+				ITSAppUsesNonExemptEncryption = NO;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.simplewithus.codecaps.macos;
+				PRODUCT_NAME = CodeCaps;
+				SDKROOT = macosx;
+			};
+			name = Release;
+		};
 		74B215A8BDABF0123A54A993 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -176,6 +289,7 @@
 				COPY_PHASE_STRIP = NO;
 				CURRENT_PROJECT_VERSION = 1;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				DEVELOPMENT_TEAM = CC8UTF7ATG;
 				ENABLE_NS_ASSERTIONS = NO;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				ENABLE_USER_SCRIPT_SANDBOXING = YES;
@@ -188,11 +302,11 @@
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
-				MARKETING_VERSION = 1.0.0;
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				MARKETING_VERSION = 0.1.0;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				PRODUCT_NAME = "$(TARGET_NAME)";
-				SDKROOT = iphoneos;
 				SWIFT_COMPILATION_MODE = wholemodule;
 				SWIFT_OPTIMIZATION_LEVEL = "-O";
 				SWIFT_STRICT_CONCURRENCY = targeted;
@@ -237,6 +351,7 @@
 				COPY_PHASE_STRIP = NO;
 				CURRENT_PROJECT_VERSION = 1;
 				DEBUG_INFORMATION_FORMAT = dwarf;
+				DEVELOPMENT_TEAM = CC8UTF7ATG;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				ENABLE_TESTABILITY = YES;
 				ENABLE_USER_SCRIPT_SANDBOXING = YES;
@@ -255,12 +370,12 @@
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
-				MARKETING_VERSION = 1.0.0;
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				MARKETING_VERSION = 0.1.0;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;
 				PRODUCT_NAME = "$(TARGET_NAME)";
-				SDKROOT = iphoneos;
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
 				SWIFT_STRICT_CONCURRENCY = targeted;
@@ -273,13 +388,16 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
+				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = CC8UTF7ATG;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = App/Info.plist;
+				ITSAppUsesNonExemptEncryption = NO;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = com.jays.codecaps.ios;
+				PRODUCT_BUNDLE_IDENTIFIER = com.simplewithus.codecaps.ios;
 				SDKROOT = iphoneos;
 				TARGETED_DEVICE_FAMILY = "1,2";
 			};
@@ -290,13 +408,16 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
+				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = CC8UTF7ATG;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = App/Info.plist;
+				ITSAppUsesNonExemptEncryption = NO;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = com.jays.codecaps.ios;
+				PRODUCT_BUNDLE_IDENTIFIER = com.simplewithus.codecaps.ios;
 				SDKROOT = iphoneos;
 				TARGETED_DEVICE_FAMILY = "1,2";
 			};
@@ -319,6 +440,15 @@
 			buildConfigurations = (
 				BFD612422B0B284AA4E41858 /* Debug */,
 				74B215A8BDABF0123A54A993 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		BE16BE186885ED1305D6FD08 /* Build configuration list for PBXNativeTarget "CodeCapsCompanionMac" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				2D36FA9F2E5CB4083D3F725D /* Debug */,
+				345C0A555C923F4DD7EBEE4D /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Debug;
