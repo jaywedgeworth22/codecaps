@@ -5,6 +5,19 @@ PR (when shipped), follow-ups (when parked).
 
 ---
 
+## 2026-09-21 — Stand up automated iOS TestFlight shipping workflow
+
+Lane: `plumber/ios-testflight-workflow`.
+
+Stood up automated GitHub-hosted macOS TestFlight ship workflow for CodeCaps Companion:
+- Created `.github/workflows/ios-ship.yml` with push trigger, path filter (`ios/CodeCapsCompanion/**`), and 30-minute cron (`26,56 * * * *`).
+- Added in-repo fleet scripts in `scripts/ios-fleet/`: `ExportOptions-*.plist`, `apps.json`, `asc-api.mjs`, `scheduled-ship-gate.sh`, and `ship-testflight.sh`.
+- Added wrapper scripts `scripts/ios-appstore-gm-prepare.sh` and `scripts/ios-ship-testflight.sh`.
+- Configured repository secrets on GitHub: `ASC_KEY_ID`, `ASC_ISSUER_ID`, `ASC_KEY_P8`, `IOS_DIST_P12_BASE64`, and `IOS_DIST_P12_PASSWORD`.
+- Verified local dry-run archive resolution and scheduled ship gate.
+
+---
+
 ## 2026-09-21 — App Group configuration & macOS companion target
 
 Lane: `ag/companion-app-group-and-mac`.
