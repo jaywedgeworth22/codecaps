@@ -14,7 +14,9 @@ Configured App Group `group.com.simplewithus.codecaps` across iOS companion and 
 - Added `CodeCapsCompanionMac` target in `ios/CodeCapsCompanion/project.yml` for macOS 14+ with bundle ID `com.simplewithus.codecaps.macos`.
 - Updated `CompanionQuotaModel.swift` to read shared defaults and quota files from the App Group container.
 - Updated `LocalQuotaSnapshot.swift` in `QuotaCore` to mirror snapshots into the shared App Group container when available.
-- Updated `CompanionContentView.swift` for clean cross-platform compilation on iOS and macOS.
+- Replaced interim mark with authentic 3D rich teal (#0B6B5D) icon matching the Usage Monitor Client design with embossed circuit traces, circular sync arrows, and glossy white plate.
+- Removed script/make_codecaps_icon.swift and assets/icon-1024-transparent.png.
+- Added script/render_teal_icon.py and updated all asset sizes (1024, 512, 192, and AppIcon).
 - Built both targets and verified all 163 unit tests pass.
 
 ---
