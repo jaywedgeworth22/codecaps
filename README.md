@@ -211,7 +211,7 @@ per run).  The app itself does not log to a file by default — Console.app →
 
 ## License
 
-MIT.
+Apache License 2.0.
 
 ## Trademarks
 
