@@ -4,10 +4,21 @@ This file is binding on every agent that works in this repo.  Read it first.
 
 ## What this is
 
-CodeCaps is a macOS menu-bar Swift app that reads quota usage from the AI
-coding CLIs already signed in on this Mac (no provider API key entered), and
-can push those readings to an endpoint you run and pull a fleet's worth back
-into one Glance popover.
+CodeCaps is a macOS menu-bar Swift app for **centralized monitoring and
+alerting of every AI subscription plan on your Mac** — usage, quotas, and
+caps across Claude, Codex, Cursor, Antigravity, Grok, MiniMax, and the
+other AI CLIs already signed in.  No provider API key is entered; CodeCaps
+reads the local files those CLIs already write.  The same readings can be
+pushed to an endpoint you run and pulled back into one Glance popover.
+
+The name "CodeCaps" is the brand; the app's scope is AI subscription
+monitoring more broadly, not just coding subscriptions.  Owner ruling,
+2026-09-21: marketing copy and taglines must not narrow the position to
+"coding subscriptions" — frame it as a centralized monitor for AI plans
+generally.  The teal "C-with-cap" mark in `assets/icon-1024.png` is the
+app's primary brand; the orange 3D mark (Usage Monitor) is reserved for
+the centralized-monitor landing surfaces (e.g. CodeCaps.SimpleWithUs.com)
+where the monitoring + sync semantics are the headline.
 
 Two SPM targets in `Package.swift`:
 
