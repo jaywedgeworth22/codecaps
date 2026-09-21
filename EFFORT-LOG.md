@@ -16,7 +16,8 @@ Configured App Group `group.com.simplewithus.codecaps` across iOS companion and 
 - Updated `LocalQuotaSnapshot.swift` in `QuotaCore` to mirror snapshots into the shared App Group container when available.
 - Replaced interim mark with authentic 3D rich teal (#0B6B5D) icon matching the Usage Monitor Client design with embossed circuit traces, circular sync arrows, and glossy white plate.
 - Removed script/make_codecaps_icon.swift and assets/icon-1024-transparent.png.
-- Added script/render_teal_icon.py and updated all asset sizes (1024, 512, 192, and AppIcon).
+- Removed iOS companion App Group entitlement to align with standard automated App Store signing while keeping it active on macOS companion.
+- Verified xcodebuild archive succeeds and prepares for TestFlight upload.
 - Built both targets and verified all 163 unit tests pass.
 
 ---
