@@ -210,14 +210,21 @@ struct ConsoleView: View {
                 .truncationMode(.tail)
             Spacer(minLength: 8)
             if !state.page.isSettings {
-                Picker("Layout", selection: $model.viewLayout) {
-                    ForEach(QuotaViewLayout.allCases) { Text($0.title).tag($0) }
+                // The compact/detailed toggle only affects the All Platforms
+                // grid (column widths and the per-card row count).  On every
+                // other page it was a dead control that pushed the search
+                // field and the page title into truncation.  Hide it
+                // everywhere the value does not have a visible effect.
+                if state.page == .allPlatforms {
+                    Picker("Layout", selection: $model.viewLayout) {
+                        ForEach(QuotaViewLayout.allCases) { Text($0.title).tag($0) }
+                    }
+                    .pickerStyle(.segmented)
+                    .labelsHidden()
+                    .frame(width: 168)
+                    .help("Quota Layout")
+                    .accessibilityLabel("Quota Layout")
                 }
-                .pickerStyle(.segmented)
-                .labelsHidden()
-                .frame(width: 168)
-                .help("Quota Layout")
-                .accessibilityLabel("Quota Layout")
 
                 HStack(spacing: 5) {
                     Image(systemName: "magnifyingglass")
