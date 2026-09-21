@@ -94,7 +94,7 @@ final class QuotaPublisherTests: XCTestCase {
         
         let json = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
         XCTAssertEqual(json["schemaVersion"] as? Int, 2)
-        XCTAssertEqual(json["producerId"] as? String, "agent-bar")
+        XCTAssertEqual(json["producerId"] as? String, "codecaps")
         XCTAssertEqual(json["producerInstanceId"] as? String, "Test-Mac")
 
         let events = try XCTUnwrap(json["events"] as? [[String: Any]])
@@ -102,7 +102,7 @@ final class QuotaPublisherTests: XCTestCase {
 
         let first = events[0]
         XCTAssertEqual(first["provider"] as? String, "anthropic")
-        XCTAssertEqual(first["service"] as? String, "agent-bar")
+        XCTAssertEqual(first["service"] as? String, "codecaps")
         XCTAssertEqual(first["label"] as? String, "Claude 5h")
         XCTAssertEqual(first["metricType"] as? String, "quota")
         XCTAssertEqual(first["limit"] as? Int, 100)
@@ -113,7 +113,7 @@ final class QuotaPublisherTests: XCTestCase {
         XCTAssertEqual(meta["bucketId"] as? String, "5h")
         XCTAssertEqual(meta["quotaWindow"] as? String, "5h")
         XCTAssertEqual(meta["resetAt"] as? String, "2026-09-14T22:00:00Z")
-        XCTAssertEqual(meta["source"] as? String, "agent-bar")
+        XCTAssertEqual(meta["source"] as? String, "codecaps")
         XCTAssertEqual(meta["usedPercent"] as? Double, 15.0)
     }
 
@@ -123,7 +123,7 @@ final class QuotaPublisherTests: XCTestCase {
         let data = try publisher.buildGenericWebhookPayload(windows: windows, occurredAtIso: "2026-09-14T19:00:00Z", machineName: "Test-MacBook")
 
         let json = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
-        XCTAssertEqual(json["format"] as? String, "agent-bar-quotas")
+        XCTAssertEqual(json["format"] as? String, "codecaps-quotas")
         XCTAssertEqual(json["version"] as? Int, 1)
         XCTAssertEqual(json["machine"] as? String, "Test-MacBook")
         XCTAssertEqual(json["count"] as? Int, 2)

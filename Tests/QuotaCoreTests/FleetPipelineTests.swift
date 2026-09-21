@@ -8,16 +8,36 @@ final class FleetPipelineTests: XCTestCase {
     /// pool windows, and another producer's per-model Antigravity readings.
     private let body = """
     {"generatedAt":"2026-09-17T03:37:53.456Z","windows":[
-      {"id":"gemini-weekly","provider":"google-antigravity","providerKey":"google-antigravity","via":"antigravity","sourceApp":"agent-bar","source":"agent-bar","modelType":"gemini","label":"Gemini Models · Weekly","remainingPercent":88.66,"window":"weekly","occurredAt":"2026-09-17T03:37:00.000Z"},
-      {"id":"third-party-weekly","provider":"google-antigravity","providerKey":"google-antigravity","via":"antigravity","sourceApp":"agent-bar","source":"agent-bar","modelType":"third-party","label":"Third-Party Models · Weekly","remainingPercent":0,"window":"weekly","occurredAt":"2026-09-17T03:37:00.000Z"},
+      {"id":"gemini-weekly","provider":"google-antigravity","providerKey":"google-antigravity","via":"antigravity","sourceApp":"codecaps","source":"codecaps","modelType":"gemini","label":"Gemini Models · Weekly","remainingPercent":88.66,"window":"weekly","occurredAt":"2026-09-17T03:37:00.000Z"},
+      {"id":"third-party-weekly","provider":"google-antigravity","providerKey":"google-antigravity","via":"antigravity","sourceApp":"codecaps","source":"codecaps","modelType":"third-party","label":"Third-Party Models · Weekly","remainingPercent":0,"window":"weekly","occurredAt":"2026-09-17T03:37:00.000Z"},
       {"id":"claude-sonnet-4-6","provider":"google-antigravity","providerKey":"google-antigravity","via":"antigravity","sourceApp":"antigravity-cli","source":"antigravity-usage","label":"Claude Sonnet 4.6 (Thinking)","remainingPercent":0,"window":"weekly","occurredAt":"2026-09-17T03:30:00.000Z"},
       {"id":"gemini-3-flash","provider":"google-antigravity","providerKey":"google-antigravity","via":"antigravity","sourceApp":"antigravity-cli","source":"antigravity-usage","label":"Gemini 3 Flash","remainingPercent":100,"window":"5h","occurredAt":"2026-09-17T03:30:00.000Z"},
+      {"id":"anthropic-five_hour","provider":"anthropic","providerKey":"anthropic","sourceApp":"codecaps","source":"codecaps","label":"5h window","remainingPercent":85,"window":"5h","occurredAt":"2026-09-17T03:37:00.000Z"}
+    ]}
+    """
+
+    /// The legacy wire producer from before the 2026-09-20 rename.  A small
+    /// fixture in its own body so a fleet that has not yet caught up still
+    /// gets its own push filed under This Mac via `legacyProducerAliases`.
+    private let legacyBody = """
+    {"generatedAt":"2026-09-17T03:37:53.456Z","windows":[
       {"id":"anthropic-five_hour","provider":"anthropic","providerKey":"anthropic","sourceApp":"agent-bar","source":"agent-bar","label":"5h window","remainingPercent":85,"window":"5h","occurredAt":"2026-09-17T03:37:00.000Z"}
     ]}
     """
 
     private func decoded() throws -> QuotaResponse {
         try JSONDecoder().decode(QuotaResponse.self, from: Data(body.utf8))
+    }
+
+    private func decodedLegacy() throws -> QuotaResponse {
+        try JSONDecoder().decode(QuotaResponse.self, from: Data(legacyBody.utf8))
+    }
+
+    func testLegacyAgentBarPushIsRecognisedAsOwn() throws {
+        let response = try decodedLegacy()
+        let split = FleetOrigin.split(response.windows, host: "Studio")
+        XCTAssertEqual(split.ownPush.count, 1)
+        XCTAssertTrue(split.groups.isEmpty)
     }
 
     func testSplittingBeforeSectioningKeepsTheSecondProducer() throws {
@@ -54,6 +74,6 @@ final class FleetPipelineTests: XCTestCase {
         // platform's four pooled windows carry two different machines between
         // them and could not be filed under either honestly.
         XCTAssertEqual(Set(pooled.map { FleetOrigin.identity(of: $0) }),
-                       ["agent-bar", "antigravity-usage", "fleet"])
+                       ["codecaps", "antigravity-usage", "fleet"])
     }
 }

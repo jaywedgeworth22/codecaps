@@ -14,23 +14,32 @@ final class FleetOriginTests: XCTestCase {
     }
 
     func testOwnPushIsRecognisedByProducerIdOrHostName() {
-        XCTAssertTrue(FleetOrigin.isOwnPush(window(source: "agent-bar", sourceApp: "agent-bar"), host: "Studio"))
+        XCTAssertTrue(FleetOrigin.isOwnPush(window(source: "codecaps", sourceApp: "codecaps"), host: "Studio"))
         XCTAssertTrue(FleetOrigin.isOwnPush(window(source: "Studio", sourceApp: nil), host: "Studio"))
         XCTAssertTrue(FleetOrigin.isOwnPush(window(source: "studio", sourceApp: nil), host: "Studio.local"))
         XCTAssertFalse(FleetOrigin.isOwnPush(window(source: "antigravity-usage", sourceApp: "antigravity-cli"),
                                              host: "Studio"))
-        XCTAssertEqual(QuotaPublisher.producerId, "agent-bar")
+        XCTAssertEqual(QuotaPublisher.producerId, "codecaps")
+    }
+
+    /// Windows recorded under the pre-rename `agent-bar` producer must still
+    /// land under This Mac until every install catches up.  After the rename
+    /// on 2026-09-20 the live id is `codecaps`; this test guards against
+    /// silently dropping the legacy alias.
+    func testLegacyAgentBarAliasIsRecognisedAsOwnPush() {
+        XCTAssertTrue(FleetOrigin.isOwnPush(window(source: "agent-bar", sourceApp: "agent-bar"), host: "Studio"))
+        XCTAssertTrue(QuotaPublisher.legacyProducerAliases.contains("agent-bar"))
     }
 
     func testEveryWindowSurvivesTheSplitAndIsGroupedByOrigin() {
         // The shape of the live payload: this Mac's push echoed back, plus a
         // second producer's own reading of the same provider.
         let windows = [
-            window(id: "anthropic-five_hour", source: "agent-bar", sourceApp: "agent-bar"),
-            window(id: "gemini-weekly", source: "agent-bar", sourceApp: "agent-bar"),
+            window(id: "anthropic-five_hour", source: "codecaps", sourceApp: "codecaps"),
+            window(id: "gemini-weekly", source: "codecaps", sourceApp: "codecaps"),
             window(id: "claude-sonnet-4-6", source: "antigravity-usage", sourceApp: "antigravity-cli"),
             window(id: "gemini-3-flash", source: "antigravity-usage", sourceApp: "antigravity-cli"),
-            window(id: "grok-bot-weekly", source: "other-mac", sourceApp: "agent-bar"),
+            window(id: "grok-bot-weekly", source: "other-mac", sourceApp: "codecaps"),
         ]
         let split = FleetOrigin.split(windows, host: "Studio")
         XCTAssertEqual(split.ownPush.map(\.id), ["anthropic-five_hour", "gemini-weekly"])
@@ -44,7 +53,7 @@ final class FleetOriginTests: XCTestCase {
 
     func testTitleReadsAsAName() {
         XCTAssertEqual(FleetOrigin.title(for: "antigravity-usage"), "Antigravity Usage")
-        XCTAssertEqual(FleetOrigin.title(for: "agent_bar"), "Agent Bar")
+        XCTAssertEqual(FleetOrigin.title(for: "codecaps"), "Codecaps")
         XCTAssertEqual(FleetOrigin.title(for: "Studio"), "Studio")
         XCTAssertEqual(FleetOrigin.title(for: "fleet"), "Fleet")
     }

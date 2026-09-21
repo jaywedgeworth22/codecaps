@@ -14,7 +14,7 @@ final class LocalQuotaSnapshotTests: XCTestCase {
         // The consumer enforces exact equality on the version, so the additive
         // keys below must not move it.
         XCTAssertEqual(payload.version, 1)
-        XCTAssertEqual(payload.producer, "agent-bar")
+        XCTAssertEqual(payload.producer, "codecaps")
         XCTAssertEqual(payload.windows, [window.normalizedForExport()])
         let attributes = try FileManager.default.attributesOfItem(atPath: url.path)
         XCTAssertEqual((attributes[.posixPermissions] as? NSNumber)?.intValue, 0o600)
@@ -37,7 +37,7 @@ final class LocalQuotaSnapshotTests: XCTestCase {
         try LocalQuotaSnapshot.write(windows: [], to: url)
         let object = try JSONSerialization.jsonObject(with: Data(contentsOf: url)) as? [String: Any]
         XCTAssertNil(object?["issues"], "an empty map must stay off the wire so the key means something")
-        XCTAssertEqual(object?["producer"] as? String, "agent-bar")
+        XCTAssertEqual(object?["producer"] as? String, "codecaps")
         XCTAssertEqual(object?["version"] as? Int, 1)
     }
 
