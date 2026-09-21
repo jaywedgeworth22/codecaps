@@ -5,7 +5,7 @@ import Foundation
 public enum LocalQuotaSnapshot {
     /// Two apps have historically targeted this path.  Naming the writer makes
     /// a collision diagnosable instead of silent.
-    public static let producerName = "agent-bar"
+    public static let producerName = "codecaps"
 
     /// The generic reason published in place of an issue string that fails the
     /// safety gate below.  The provider still shows as failing; the unsafe text
@@ -129,7 +129,9 @@ public enum LocalQuotaSnapshot {
         guard reason.count <= 240, reason.rangeOfCharacter(from: .controlCharacters) == nil else { return false }
         let lowered = reason.lowercased()
         // Shapes that are a credential wherever they appear in the sentence.
-        let markers = ["bearer ", "eyj", "-----begin", "authorization:", "access_token", "accesstoken",
+        // `bearer` covers a space, equals sign, tab and colon after the word so
+        // header lines (`Bearer=`, `bearer `, `bearer:`) all match.
+        let markers = ["bearer ", "bearer=", "bearer\t", "bearer:", "eyj", "-----begin", "authorization:", "access_token", "accesstoken",
                        "refresh_token", "refreshtoken", "client_secret", "clientsecret", "api_key", "apikey", "password"]
         if markers.contains(where: lowered.contains) { return false }
         // An address names the owner's account rather than the failure.

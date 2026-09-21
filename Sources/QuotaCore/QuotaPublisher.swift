@@ -62,7 +62,17 @@ public actor QuotaPublisher {
     /// The producer this app pushes under.  A window pulled back from the fleet
     /// carrying this producer is this Mac's own reading making a round trip, so
     /// the UI shows it under This Mac rather than duplicating it under Fleet.
-    public static let producerId = "agent-bar"
+    ///
+    /// Renamed from `agent-bar` to `codecaps` on 2026-09-20.  The old name
+    /// remains a recognised alias in `FleetOrigin.isOwnPush` so windows
+    /// recorded by older builds (or echoed by a fleet that has not yet
+    /// caught up) still land under This Mac.
+    public static let producerId = "codecaps"
+
+    /// Producer names this app recognises as its own for the purpose of
+    /// filing a pulled window under This Mac.  The first entry is the live
+    /// `producerId`; the rest are legacy aliases from before the rename.
+    public static let legacyProducerAliases: [String] = ["agent-bar"]
 
     /// The instance this Mac pushes under, so a pulled window can be recognised
     /// as its own even when a payload carries the instance rather than the
@@ -115,7 +125,7 @@ public actor QuotaPublisher {
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.setValue("application/json", forHTTPHeaderField: "Accept")
         request.setValue("2", forHTTPHeaderField: "x-usage-telemetry-version")
-        request.setValue("agent-bar/1.0", forHTTPHeaderField: "User-Agent")
+        request.setValue("codecaps/1.1.0", forHTTPHeaderField: "User-Agent")
 
         if let token = token.map(sanitizedToken(_:)), !token.isEmpty {
             request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
@@ -195,7 +205,7 @@ public actor QuotaPublisher {
             var event: [String: Any] = [
                 "eventId": eventId,
                 "provider": window.canonicalProviderKey,
-                "service": "agent-bar",
+                "service": "codecaps",
                 "label": window.label,
                 "metricType": "quota",
                 "billingMode": "actual",
@@ -237,7 +247,7 @@ public actor QuotaPublisher {
         }
 
         let root: [String: Any] = [
-            "format": "agent-bar-quotas",
+            "format": "codecaps-quotas",
             "version": 1,
             "generatedAt": occurredAtIso,
             "machine": machine,

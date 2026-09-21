@@ -105,13 +105,7 @@ public struct LocalQuotaReader: Sendable {
     private func readClaude() async throws -> ProviderRead {
         let provider = Provider.claude
         let file = (try? readJSONObject(relativePath: ".claude/.credentials.json")) ?? [:]
-        func validOAuth(_ root: [String: Any]) -> [String: Any]? {
-            let value = record(root["claudeAiOauth"])
-            guard firstString(value, ["accessToken", "access_token"]) != nil else { return nil }
-            if let expiry = firstTimestamp(value, ["expiresAt", "expires_at"]), let date = parseDate(expiry), date <= now() { return nil }
-            return value
-        }
-        var candidate = validOAuth(file)
+        var candidate = ClaudeOAuthParser.validOAuth(in: file, now: now())
         // The Keychain is consulted only when Claude Code's own file has no
         // usable credential, so a fresh file never costs a Keychain call.
         var access = ClaudeCredentialAccess.missing
@@ -119,7 +113,7 @@ public struct LocalQuotaReader: Sendable {
             access = await ClaudeCredentialSource.boundedAccess { await readClaudeCredential() }
             if let data = access.data, data.count <= Self.maxCredentialBytes,
                let root = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any] {
-                candidate = validOAuth(root)
+                candidate = ClaudeOAuthParser.validOAuth(in: root, now: now())
             }
         }
         guard let oauth = candidate, let token = firstString(oauth, ["accessToken", "access_token"]) else {
@@ -168,12 +162,44 @@ public struct LocalQuotaReader: Sendable {
         guard let root = try readJSONObject(relativePath: ".grok/auth.json") else {
             return ProviderRead(provider: provider, windows: [], issue: "Grok is not signed in locally.")
         }
-        let profiles = root.values.compactMap { $0 as? [String: Any] }
-        let profile = root.count == 1 && profiles.count == 1 ? profiles[0] : root
-        guard let token = firstString(profile, ["key", "access_token", "accessToken", "token", "api_key", "apiKey", "tokens.access_token", "tokens.accessToken", "auth.access_token"]) else {
+        // Try every plausible flat and nested key path against the root
+        // first.  `firstString` walks dotted paths, so this list covers the
+        // shapes where Grok stores under a `tokens` or `auth` sub-dict.
+        let tokenKeys = [
+            "key", "access_token", "accessToken", "token", "api_key", "apiKey",
+            "tokens.key", "tokens.access_token", "tokens.accessToken",
+            "tokens.token", "tokens.api_key", "tokens.apiKey",
+            "auth.key", "auth.access_token", "auth.accessToken",
+            "auth.token", "auth.api_key", "auth.apiKey",
+        ]
+        var token = firstString(root, tokenKeys)
+        // Fall back to the single-key unwrap.  Grok also stores credentials
+        // keyed by an endpoint URL (`{"https://api.x.ai": {"key": "..."}}`),
+        // which is not reachable through the dotted-key list above because
+        // the host name is data, not a known constant.  The unwrap only fires
+        // when there is exactly one top-level key whose value is a dict, so
+        // it cannot accidentally pick a wrong sub-dict when the file has
+        // multiple sections.
+        if token == nil {
+            let profiles = root.values.compactMap { $0 as? [String: Any] }
+            if root.count == 1, profiles.count == 1 {
+                token = firstString(profiles[0], tokenKeys)
+            }
+        }
+        guard let token else {
             return ProviderRead(provider: provider, windows: [], issue: "Grok is not signed in locally.")
         }
-        if let expiry = firstTimestamp(profile, ["expires_at", "expiresAt"]), let date = parseDate(expiry), date <= now() {
+        let expiryKeys = ["expires_at", "expiresAt",
+                          "tokens.expires_at", "tokens.expiresAt",
+                          "auth.expires_at", "auth.expiresAt"]
+        var expiry = firstTimestamp(root, expiryKeys)
+        if expiry == nil {
+            let profiles = root.values.compactMap { $0 as? [String: Any] }
+            if root.count == 1, profiles.count == 1 {
+                expiry = firstTimestamp(profiles[0], expiryKeys)
+            }
+        }
+        if let expiry, let date = parseDate(expiry), date <= now() {
             return ProviderRead(provider: provider, windows: [], issue: "Grok needs you to sign in again.")
         }
         var request = URLRequest(url: URL(string: "https://cli-chat-proxy.grok.com/v1/billing?format=credits")!)

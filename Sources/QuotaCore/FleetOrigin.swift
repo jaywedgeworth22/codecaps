@@ -21,9 +21,10 @@ public enum FleetOrigin {
     /// window belongs under This Mac and must never be duplicated under Fleet.
     public static func isOwnPush(_ window: QuotaWindow, host: String = QuotaPublisher.producerInstanceId) -> Bool {
         let identity = identity(of: window).lowercased()
-        let mine = [QuotaPublisher.producerId.lowercased(),
-                    host.lowercased(),
-                    host.lowercased().replacingOccurrences(of: ".local", with: "")]
+        let mine = [QuotaPublisher.producerId.lowercased()]
+            + QuotaPublisher.legacyProducerAliases.map { $0.lowercased() }
+            + [host.lowercased(),
+               host.lowercased().replacingOccurrences(of: ".local", with: "")]
         return mine.contains(identity)
     }
 
