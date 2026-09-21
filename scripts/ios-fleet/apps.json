@@ -1,0 +1,17 @@
+{
+  "teamId": "CC8UTF7ATG",
+  "apps": {
+    "codecaps": {
+      "displayName": "CodeCaps Companion",
+      "bundleId": "com.simplewithus.codecaps.ios",
+      "appleId": 6814623846,
+      "platform": "iOS",
+      "scheme": "CodeCapsCompanion",
+      "projectRel": "ios/CodeCapsCompanion/CodeCapsCompanion.xcodeproj",
+      "xcodegenDir": "ios/CodeCapsCompanion",
+      "worktreeHint": "~/Code/codecaps",
+      "marketingVersionDefault": "0.1.0",
+      "notes": "CodeCaps Companion — iOS companion for CodeCaps AI subscription monitor. Apple ID 6814623846 registered on ASC. ASC SKU codecaps-companion-ios."
+    }
+  }
+}

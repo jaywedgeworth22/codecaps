@@ -1,0 +1,113 @@
+name: iOS TestFlight ship (GitHub-hosted macOS)
+
+# Archive + upload on GitHub-hosted macos-latest (fleet protocol 2026-08-24).
+# Signing + ASC keys come from repo secrets:
+#   ASC_KEY_ID, ASC_ISSUER_ID, ASC_KEY_P8,
+#   IOS_DIST_P12_BASE64, IOS_DIST_P12_PASSWORD
+# scripts/ios-appstore-gm-prepare.sh writes ~/.secrets/appstore-connect.env
+# and imports the Distribution identity. Values are never printed.
+#
+# Marketing train is 0.1.N; build is UTC YYYYMMDDHHMM.
+# Bundle `com.simplewithus.codecaps.ios` and team `CC8UTF7ATG`.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'ios/CodeCapsCompanion/**'
+      - '.github/workflows/ios-ship.yml'
+      - 'scripts/ios-fleet/**'
+      - 'scripts/ios-ship-testflight.sh'
+      - 'scripts/ios-appstore-gm-prepare.sh'
+  workflow_dispatch:
+  schedule:
+    # Twice an hour, offset from other fleet apps
+    - cron: '26,56 * * * *'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ios-ship-codecaps
+  cancel-in-progress: false
+
+jobs:
+  ship:
+    name: TestFlight archive + upload
+    if: github.event.repository.fork == false
+    runs-on: macos-latest
+    timeout-minutes: 90
+    env:
+      DEVELOPER_DIR: /Applications/Xcode.app/Contents/Developer
+      ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+      ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+      ASC_KEY_P8: ${{ secrets.ASC_KEY_P8 }}
+      IOS_DIST_P12_BASE64: ${{ secrets.IOS_DIST_P12_BASE64 }}
+      IOS_DIST_P12_PASSWORD: ${{ secrets.IOS_DIST_P12_PASSWORD }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v4
+        with:
+          fetch-depth: 0
+
+      - name: Restore ship-state cache
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.cache/ios-fleet
+          key: ios-fleet-state-codecaps-${{ github.run_id }}-${{ github.run_attempt }}
+          restore-keys: |
+            ios-fleet-state-codecaps-${{ github.run_id }}-
+            ios-fleet-state-codecaps-
+
+      - name: Scheduled ship gate (skip unless iOS code changed)
+        id: gate
+        run: |
+          bash "$GITHUB_WORKSPACE/scripts/ios-fleet/scheduled-ship-gate.sh" \
+            --event "${{ github.event_name }}" \
+            --path-prefix 'ios/CodeCapsCompanion/' \
+            --repo-root "$GITHUB_WORKSPACE" \
+            codecaps
+
+      - name: Assert stable Xcode (never beta)
+        if: steps.gate.outputs.should_ship == '1'
+        run: |
+          echo "DEVELOPER_DIR=${DEVELOPER_DIR}"
+          xcodebuild -version
+          ver=$(xcodebuild -version | awk 'NR==1{print $2}')
+          echo "Xcode version: ${ver}"
+          case "$DEVELOPER_DIR" in
+            *[Bb]eta*)
+              echo "::error::DEVELOPER_DIR resolves to a beta Xcode: $DEVELOPER_DIR"
+              exit 1
+              ;;
+          esac
+
+      - name: Install xcodegen
+        if: steps.gate.outputs.should_ship == '1'
+        run: |
+          if command -v xcodegen >/dev/null 2>&1; then
+            xcodegen --version
+          else
+            brew install xcodegen
+          fi
+
+      - name: Import signing + ASC key
+        if: steps.gate.outputs.should_ship == '1'
+        run: |
+          if [ -z "${ASC_KEY_ID:-}" ]; then
+            echo "::error::ASC_KEY_ID empty. Confirm ASC_/IOS_DIST_ secrets are configured."
+            exit 1
+          fi
+          bash "$GITHUB_WORKSPACE/scripts/ios-appstore-gm-prepare.sh"
+
+      - name: Ship CodeCaps to TestFlight
+        if: steps.gate.outputs.should_ship == '1'
+        env:
+          IOS_TF_RELEASE_NOTES: "1"
+        run: bash scripts/ios-ship-testflight.sh
+
+      - name: Save ship-state cache
+        if: always()
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.cache/ios-fleet
+          key: ios-fleet-state-codecaps-${{ github.run_id }}-${{ github.run_attempt }}
