@@ -58,20 +58,20 @@ The first time a freshly installed CodeCaps needs Claude Code's Keychain item, m
 
 Both off by default, configured on Console → Settings → Sources & Fleet.
 
-**Push formats** — two, chosen when pushing.  The producer id stays `agent-bar`, so a rename of the app does not split an existing Usage Monitor history.
+**Push formats** — two, chosen when pushing.  The producer id is `codecaps` (with `agent-bar` retained as a recognized legacy alias for seamless backwards compatibility).
 
 `usage_monitor_v2` — one event per quota window:
 
 ```json
 {
   "schemaVersion": 2,
-  "producerId": "agent-bar",
+  "producerId": "codecaps",
   "producerInstanceId": "Jay's MacBook Pro",
   "events": [
     {
       "eventId": "subq:anthropic:5h-window:2026-09-17T14:00:00Z:2026-09-17T14:41:00Z",
       "provider": "anthropic",
-      "service": "agent-bar",
+      "service": "codecaps",
       "label": "5h",
       "metricType": "quota",
       "billingMode": "actual",
@@ -84,7 +84,7 @@ Both off by default, configured on Console → Settings → Sources & Fleet.
         "isExhausted": false,
         "remainingUnknown": false,
         "scale": "percent_0_100",
-        "source": "agent-bar",
+        "source": "codecaps",
         "usedPercent": 38.0
       },
       "tier": "Max 20x"
@@ -97,7 +97,7 @@ Both off by default, configured on Console → Settings → Sources & Fleet.
 
 ```json
 {
-  "format": "agent-bar-quotas",
+  "format": "codecaps-quotas",
   "version": 1,
   "generatedAt": "2026-09-17T14:41:00Z",
   "machine": "Jay's MacBook Pro",
@@ -125,7 +125,7 @@ Both off by default, configured on Console → Settings → Sources & Fleet.
 
 **Token storage.**  The Ingest Token and Read Token are the only two secrets stored, both in the macOS Keychain, not a config file.
 
-## Local Handoff File
+## BotFleet Local Handoff
 
 Independent of any server, CodeCaps writes a credential-free local snapshot to:
 
@@ -133,7 +133,7 @@ Independent of any server, CodeCaps writes a credential-free local snapshot to:
 ~/Library/Application Support/Usage Monitor/quota-windows.json
 ```
 
-for other local consumers (for example, BotFleet's Usage Monitor).  `format` is `usage-monitor-local-quotas`, `version` `1`, alongside `producer` (`"agent-bar"`), `generatedAt`, a `windows` array, and an optional `issues` map — no server URLs, account identifiers, or tokens; error strings are checked for anything credential-shaped first.  Written `0600` inside a `0700` directory, via an atomic rename.
+for other local consumers (for example, BotFleet's Usage Monitor).  `format` is `usage-monitor-local-quotas`, `version` `1`, alongside `producer` (`"codecaps"`), `generatedAt`, a `windows` array, and an optional `issues` map — no server URLs, account identifiers, or tokens; error strings are checked for anything credential-shaped first.  Written `0600` inside a `0700` directory, via an atomic rename.
 
 ## Install
 
