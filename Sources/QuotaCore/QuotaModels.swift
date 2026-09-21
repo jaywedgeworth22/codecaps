@@ -470,7 +470,7 @@ private enum QuotaProviders {
         Expected(key: "openai", label: "Codex", via: nil),
         Expected(key: "google-antigravity", label: "Antigravity", via: "antigravity"),
         Expected(key: "cursor", label: "Cursor", via: nil),
-        Expected(key: "xai", label: "Grok CLI", via: nil),
+        Expected(key: "xai", label: "Grok", via: nil),
         Expected(key: "grok-bot", label: "Grok Bot", via: "cursor"),
         Expected(key: "minimax", label: "MiniMax", via: nil),
     ]
