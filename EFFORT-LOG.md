@@ -75,3 +75,51 @@ theme-default change:
 - audit #6 — `PlatformDetailPage` save debounce 250ms (2151862).
 - audit #7 — Glance consent-needed row rendering (36757fc).
 - audit #8 — Dynamic Type on body copy (bd10335).
+
+---
+
+## 2026-09-22 — Polish Glance popover layout and add row expansion
+
+Lane: `mm/glance-popover-polish-2026-09-22` (PR opening on push).
+
+User feedback from a Glance popover screenshot (2026-09-22):  percent column
+was clipping the % on Antigravity rows (10...), the trailing countdown was
+clipping long strings (12h 5...), the middot between 7 of 7 and the time
+was tight, and the Refresh button was redundant because
+MonitorModel.refreshTimer (300s) plus the 30s clock already keep the popover
+current.  Glance is also the surface the owner actually opens, but it only
+showed each provider headline percentage; tapping a row now expands inline
+to list every window for that provider.
+
+GlanceViews.swift:
+- Widen percent column 40pt -> 48pt and trailing column 58pt -> 64pt; widen
+  the no-percent branch from 106pt to 112pt.  Add lineLimit(1),
+  minimumScaleFactor(0.85) and fixedSize(horizontal: true) on the percent
+  Text so a flexible HStack can never shrink the column enough to clip the
+  % again.
+- headerStatus now uses two ASCII spaces on either side of the middot
+  (7 of 7  ·  2:22 PM), matching the fleet two-space convention.
+- Move the Refresh button out of the footer and into the header.  Icon-only
+  (arrow.clockwise), with a ProgressView replacing the icon while
+  MonitorModel.isRefreshing.  Tooltip and accessibility label still identify
+  it as Refresh Quotas.
+- Add @State expandedIds to GlancePopover, plus a toggleExpanded helper.
+  Pass isExpanded and onTap through to GlanceRow.  Tapping a row toggles
+  its expansion; tapping the alarm-bell button inside the trailing column
+  short-circuits the gesture so an arm or disarm never accidentally expands
+  a row.
+- Render the inline expansion as a VStack of label / percent remaining /
+  reset countdown, one row per QuotaWindowSnapshot, using
+  AntigravityDisplay.windowLabel for the human-readable window name.
+  Tinted surface background, chevron on the rightmost edge of the row rotates
+  180 degrees when expanded, .animation(.easeInOut(duration: 0.18), value: isExpanded).
+
+Fleet pull already returns distinct per-machine snapshots
+(FleetOrigin.split in QuotaCore/FleetOrigin.swift); there is no aggregation,
+so a MiniMax 63% on this Mac and a different percentage in the Fleet
+section are two independent reads from separate API sessions, not a single
+quota shown two ways.  The expanded row labels now make origin legible
+without inspecting the underlying window.
+
+Board 42ae688ab3b84d9aa65e445aab072a15.  Closes #37.
+
