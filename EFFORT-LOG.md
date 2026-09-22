@@ -123,3 +123,43 @@ without inspecting the underlying window.
 
 Board 42ae688ab3b84d9aa65e445aab072a15.  Closes #37.
 
+
+---
+
+## 2026-09-22 — App-wide design audit + Console sidebar resize (F-01)
+
+Lane: `mm/app-design-audit-2026-09-22` (PR #40 merged).
+
+Top-to-bottom UI review of CodeCaps Mac + iOS.  Audit doc lives at
+`docs/design/2026-09-22-app-audit.md` (15K).  Defines a yardstick (restraint,
+system theme, two spaces, Title Case, custom Theme palette, one number per
+row, popover chrome restraint), inventories every owner-facing surface on
+Mac and iOS, lists 10 findings with file:line references, and groups the
+remaining 7 items into 6 follow-up PRs.
+
+Immediate user ask landed:
+
+- F-01 (P0 Console sidebar too narrow and not adjustable) shipped as
+  PR #40 with auto-merge; 174/174 tests pass.
+- `ConsoleView` now reads a stored sidebarWidth from `UserDefaults`
+  (key `consoleSidebarWidth`), default 240pt, clamped to [200, 400],
+  with a 1pt visible hairline inside an 8pt grab zone,
+  `NSCursor.resizeLeftRight` on hover, drag-to-resize, persist on
+  gesture end.
+
+Remaining findings (7 queued, referenced in GH #41):
+
+- F-06 (P1) Console toolbar density
+- F-02 (P2) iOS Theme tokens
+- F-03 (P2) iOS click-to-expand rows
+- F-04 (P2) iOS in-foreground reset pulse
+- F-05 (P2) iOS settings sheet medium detent
+- F-07 (P2) Console window min 880x600
+- F-10 (P2) iOS provider-key grouping
+
+Board 4cef1b89cf594d55b2e41c2aa4d3f757.  Closes nothing yet (roadmap
+PRs pending owner reprioritisation).  Open question surfaced: the
+audit brief referenced `home.jays.services` as a visual reference;
+that domain currently routes to the Vercel sign-in page so cannot
+serve as the rubric; owner to confirm what they meant.
+
