@@ -115,21 +115,43 @@ final class ConsoleState: ObservableObject {
     }
 }
 
-/// The one window.  Deliberately a plain `HStack` rather than a
-/// `NavigationSplitView`: the sidebar is a two-section flat list that needs
-/// neither a collapse toggle nor animated column resizing, and a fixed 200pt
-/// column is exactly what the design asks for.
+/// The one window.  Deliberately a plain `HStack` with a custom splitter
+/// rather than `NavigationSplitView`: the sidebar is still a two-section flat
+/// list that needs no system collapse toggle, but the column is now
+/// user-resizable from `Metrics.sidebarWidthMin` to
+/// `Metrics.sidebarWidthMax`, defaulting to `Metrics.sidebarWidthDefault`.
+/// The owner drag handle is in `ConsoleSidebarSplitter`; the chosen width
+/// persists in `consoleSidebarWidth` so a wider window they prefer for a
+/// 32" display stays wide across launches.
 struct ConsoleView: View {
     @ObservedObject var model: MonitorModel
     @ObservedObject var state: ConsoleState
     @State private var query = ""
+    /// Owner-resizable column width, clamped to the design bounds, default
+    /// loaded from `UserDefaults.standard` so a wider sidebar chosen on a
+    /// big display stays wide; a fresh install lands on
+    /// `Metrics.sidebarWidthDefault`.
+    @State private var sidebarWidth: CGFloat
     @FocusState private var searchFocused: Bool
+
+    init(model: MonitorModel, state: ConsoleState) {
+        self.model = model
+        self.state = state
+        let raw = UserDefaults.standard.double(forKey: "consoleSidebarWidth")
+        let initial = raw == 0 ? Metrics.sidebarWidthDefault : CGFloat(raw)
+        _sidebarWidth = State(initialValue: max(Metrics.sidebarWidthMin,
+                                                min(Metrics.sidebarWidthMax, initial)))
+    }
 
     var body: some View {
         HStack(spacing: 0) {
             ConsoleSidebar(model: model, state: state)
-                .frame(width: Metrics.sidebarWidth)
-            Divider()
+                .frame(width: sidebarWidth)
+            // The divider visible on screen *is* the splitter's 1pt rectangle;
+            // the wider 8pt invisible band is the grab target for the cursor.
+            // No standalone `Divider()` so the visible line lives in exactly
+            // one place.
+            ConsoleSidebarSplitter(width: $sidebarWidth)
             detail
         }
         .foregroundStyle(Theme.ink)
@@ -262,6 +284,62 @@ struct ConsoleView: View {
         .padding(.horizontal, Metrics.pagePadding)
         .frame(height: Metrics.toolbarHeight)
         .background(Theme.surface)
+    }
+}
+
+/// Thin grab strip between the sidebar and the detail pane.  Renders a
+/// 1pt hairline divider inside an 8pt invisible hit zone; flipping the
+/// cursor to `resizeLeftRight` on hover, and dragging the column to a new
+/// width on press-and-drag.  The chosen width is persisted to
+/// `consoleSidebarWidth` only when the drag releases, so a 200-frame-per-
+/// second drag does not flood `UserDefaults`.
+///
+/// An AppKit `NSCursor.push()/pop()` is the right tool here even though
+/// the rest of `ConsoleView` is pure SwiftUI; the cursor change is a
+/// window-level concern that SwiftUI's `.onHover` cannot deliver on its
+/// own.
+private struct ConsoleSidebarSplitter: View {
+    @Binding var width: CGFloat
+    @State private var isHovering = false
+    @State private var dragStart: CGFloat?
+
+    var body: some View {
+        ZStack {
+            Rectangle()
+                .fill(Theme.hairline)
+                .frame(width: 1)
+            Color.clear
+                .frame(width: 8)
+                .contentShape(Rectangle())
+                .onHover { hovering in
+                    isHovering = hovering
+                    if hovering {
+                        NSCursor.resizeLeftRight.push()
+                    } else {
+                        NSCursor.pop()
+                    }
+                }
+                .gesture(
+                    DragGesture(minimumDistance: 0)
+                        .onChanged { value in
+                            // Capture the column width on first movement, so
+                            // each subsequent translation is relative to the
+                            // gesture start rather than the last frame, and
+                            // an already-resized column does not drift while
+                            // the user drags.
+                            if dragStart == nil { dragStart = width }
+                            let newWidth = (dragStart ?? width) + value.translation.width
+                            width = max(Metrics.sidebarWidthMin,
+                                        min(Metrics.sidebarWidthMax, newWidth))
+                        }
+                        .onEnded { _ in
+                            dragStart = nil
+                            UserDefaults.standard.set(Double(width), forKey: "consoleSidebarWidth")
+                        }
+                )
+        }
+        .frame(width: 8)
+        .background(isHovering ? Color.accentColor.opacity(0.15) : Color.clear)
     }
 }
 
