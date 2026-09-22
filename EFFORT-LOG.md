@@ -123,3 +123,46 @@ without inspecting the underlying window.
 
 Board 42ae688ab3b84d9aa65e445aab072a15.  Closes #37.
 
+
+---
+
+## 2026-09-22 — Reset alarm sound picker (Mac + iOS)
+
+Lane: `mm/reset-alarm-sounds-2026-09-22` (PR #43 merged).
+
+User asked for "a couple options for the sound alert" + clarification on
+whether the alert pushes to Mac and iOS or only sounds locally.
+
+Shipped:
+
+- New `ResetAlarmSound` enum in `Sources/QuotaCore/ResetAlarmSound.swift`
+  with 9 cases (systemDefault, Glass, Submarine, Frog, Blow, Bottle,
+  Tink, Sosumi, silent).  iOS gets `ios/CodeCapsCompanion/App/Models/ResetAlarmSound.swift`,
+  a near-verbatim mirror; the two share a raw-value contract pinned by
+  `Tests/QuotaCoreTests/ResetAlarmSoundTests.swift`.
+- Mac `ResetAlarmManager.alarmSound: ResetAlarmSound` (was
+  `soundOnReset: Bool`) with one-time migration in `init`.  The
+  alert chime no longer double-fires — `UNNotificationSound` carries
+  the picked sound on `content.sound` instead of also playing
+  `NSSound(named: "Glass")` after the notification posts.
+- Mac `SettingsNotificationsPage` swaps the toggle for a 9-value Sound
+  picker + Preview Sound button (hidden when the picker is Silent).
+- iOS `CompanionQuotaModel.alarmSound` reads the App Group `alarmSound`
+  key so a value picked on Mac applies to the companion app, then
+  `sendResetAlert` carries the chosen sound on `content.sound` (silent
+  produces nil sound so the banner is muted but still shows).
+- iOS Settings sheet gains a Reset Alert Sound picker next to the
+  Notify toggle.
+
+Cross-device push (the second half of the user's question): today
+local `UNUserNotification` only on whichever device's own refresh
+cycle observes the reset.  No APNs, no fleet server fanout.  Skipped
+to GH #42 with a design sketch (Mac A -> fleet /v2/alerts -> Mac B
+and iOS-via-APNs) gated on having a hosted backend, which is not
+yet a thing.
+
+188/188 tests pass on the lane (was 174 on main, +14 new).
+
+Board 2b922851ddbb42b1966c281e85036bd3.  Closes nothing yet
+(cross-device push a deferred item in #42).
+
