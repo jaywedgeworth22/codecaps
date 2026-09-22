@@ -4,12 +4,17 @@ import QuotaCore
 import UserNotifications
 
 /// The payload sent when a quota reset alert is triggered.
+///
+/// Carries the picked `ResetAlarmSound` so a test (and a future custom
+/// delivery handler) can verify the alert honours the Settings picker
+/// instead of trusting an external `UNNotificationSound` round-trip.
 public struct ResetAlarmNotification: Equatable, Sendable {
     public let id: String
     public let sectionId: String
     public let title: String
     public let body: String
     public let remainingPercent: Int
+    public let sound: ResetAlarmSound
 }
 
 /// Manages reset alerts and alarms when exhausted quotas clear.
@@ -26,8 +31,13 @@ public final class ResetAlarmManager: ObservableObject {
         didSet { defaults.set(notifyOnReset, forKey: "notifyOnReset") }
     }
 
-    @Published public var soundOnReset: Bool {
-        didSet { defaults.set(soundOnReset, forKey: "soundOnReset") }
+    /// Which sound the alarm plays.  Persisted as the raw value (a system
+    /// sound name), so the migration just writes the new key and the
+    /// legacy `soundOnReset` Bool is read once in `init`.  Defaults to
+    /// `systemDefault` so a fresh install lands on the platform chime,
+    /// matching the previous behaviour when `soundOnReset` was true.
+    @Published public var alarmSound: ResetAlarmSound {
+        didSet { defaults.set(alarmSound.rawValue, forKey: "alarmSound") }
     }
 
     @Published public var armedSectionIds: Set<String> {
@@ -43,15 +53,58 @@ public final class ResetAlarmManager: ObservableObject {
     /// Injectable notification handler for unit testing.
     var onNotification: ((ResetAlarmNotification) -> Void)?
 
-    /// Injectable sound player for unit testing.
+    /// Injectable sound player for unit testing.  Kept for the
+    /// `sendTestNotification()` flow and for owners who set the picker
+    /// to a system name we expose via `NSSound(named:)` even when
+    /// notifications are off, so the preview button in Settings still
+    /// plays the chosen tone.
     var onPlaySound: (() -> Void)?
 
     public init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
         self.notifyOnReset = defaults.object(forKey: "notifyOnReset") as? Bool ?? true
-        self.soundOnReset = defaults.object(forKey: "soundOnReset") as? Bool ?? true
+        // One-time migration from the legacy boolean: a fresh owner who
+        // previously had `soundOnReset = true` lands on `.systemDefault`;
+        // one who had turned it off lands on `.silent`.  Once the new key
+        // is written, the legacy key is never read again.  Resolve the
+        // value into a local first because reading `self.alarmSound`
+        // inside `didSet` before every stored property is initialised
+        // makes Swift reject the init.
+        let resolved: ResetAlarmSound
+        if let raw = defaults.string(forKey: "alarmSound"),
+           let migrated = ResetAlarmSound(rawValue: raw) {
+            resolved = migrated
+        } else if let legacySoundOn = defaults.object(forKey: "soundOnReset") as? Bool {
+            resolved = legacySoundOn ? .systemDefault : .silent
+            defaults.set(resolved.rawValue, forKey: "alarmSound")
+        } else {
+            resolved = .systemDefault
+        }
+        self.alarmSound = resolved
         let savedArmed = defaults.stringArray(forKey: "armedResetAlarmSectionIds") ?? []
         self.armedSectionIds = Set(savedArmed)
+    }
+
+    /// Plays the picked sound.  Used by the Settings "Preview" button so
+    /// the owner can hear a sound before saving; called both with an
+    /// armed payload (during a real reset alert) and with no payload at
+    /// all (during a preview), so this is parameterless and emits via
+    /// `NSSound(named:)`.  `.silent` and `.systemDefault` are special-cased
+    /// so a preview of `Default chime` does not double-fire alongside the
+    /// system chime the notification would deliver.
+    public func previewChosenSound() {
+        let sound = alarmSound
+        guard sound.isAudible else { return }
+        if let onPlaySound {
+            onPlaySound()
+            return
+        }
+        switch sound {
+        case .systemDefault:
+            NSSound.beep()
+        default:
+            NSSound(named: sound.rawValue)?.play()
+        }
     }
 
     private static var isRunningUnderTests: Bool {
@@ -172,6 +225,22 @@ public final class ResetAlarmManager: ObservableObject {
 
     // MARK: - Dispatch
 
+    /// Resolves the picked sound into the `UNNotificationSound` value
+    /// the alert carries.  `.silent` produces `nil` (the banner still
+    /// appears; the alert is just muted); `.systemDefault` hands back
+    /// the platform default chime; every other case builds the named
+    /// system sound from `ResetAlarmSound.rawValue`.
+    private func notificationSound(for sound: ResetAlarmSound) -> UNNotificationSound? {
+        switch sound {
+        case .silent:
+            return nil
+        case .systemDefault:
+            return .default
+        default:
+            return UNNotificationSound(named: UNNotificationSoundName(sound.rawValue))
+        }
+    }
+
     private func dispatchAlert(for section: DisplaySection) {
         let pct = Int((section.remainingPercent ?? 100).rounded())
         let title = "Quota Reset: \(section.title)"
@@ -182,20 +251,22 @@ public final class ResetAlarmManager: ObservableObject {
             sectionId: section.id,
             title: title,
             body: body,
-            remainingPercent: pct
+            remainingPercent: pct,
+            sound: alarmSound
         )
 
         // Deliver via custom test handler if installed
         if let onNotification {
             onNotification(payload)
         } else if Self.canUseUserNotifications {
-            // Deliver via macOS User Notifications
+            // Deliver via macOS User Notifications; the sound picked in
+            // Settings travels on the payload so the notification owns the
+            // audio output.  We no longer fire a second `NSSound(named:)`
+            // after, which used to make the alarm ring twice.
             let content = UNMutableNotificationContent()
             content.title = title
             content.body = body
-            if soundOnReset {
-                content.sound = .default
-            }
+            content.sound = notificationSound(for: alarmSound)
 
             let request = UNNotificationRequest(
                 identifier: "codecaps.reset.\(section.id).\(Date().timeIntervalSince1970)",
@@ -203,14 +274,6 @@ public final class ResetAlarmManager: ObservableObject {
                 trigger: nil
             )
             UNUserNotificationCenter.current().add(request)
-        }
-
-        if soundOnReset {
-            if let onPlaySound {
-                onPlaySound()
-            } else {
-                NSSound(named: "Glass")?.play()
-            }
         }
     }
 
@@ -226,29 +289,20 @@ public final class ResetAlarmManager: ObservableObject {
                 sectionId: "test",
                 title: title,
                 body: body,
-                remainingPercent: 100
+                remainingPercent: 100,
+                sound: alarmSound
             ))
         } else if Self.canUseUserNotifications {
             let content = UNMutableNotificationContent()
             content.title = title
             content.body = body
-            if soundOnReset {
-                content.sound = .default
-            }
+            content.sound = notificationSound(for: alarmSound)
             let request = UNNotificationRequest(
                 identifier: "codecaps.test.\(Date().timeIntervalSince1970)",
                 content: content,
                 trigger: nil
             )
             UNUserNotificationCenter.current().add(request)
-        }
-
-        if soundOnReset {
-            if let onPlaySound {
-                onPlaySound()
-            } else {
-                NSSound(named: "Glass")?.play()
-            }
         }
     }
 }

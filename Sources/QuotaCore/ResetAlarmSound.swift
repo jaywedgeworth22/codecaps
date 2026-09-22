@@ -1,0 +1,70 @@
+import Foundation
+
+/// The sound the reset alarm plays when a previously exhausted or
+/// user-armed quota becomes usable again.
+///
+/// The raw value doubles as the system sound name on macOS (e.g. `"Glass"`,
+/// `"Submarine"`), so a single source of truth resolves both the picker
+/// label and the `NSSound(named:)`/`UNNotificationSound(named:)` call
+/// without a separate mapping.  Two values do not map to a system sound
+/// name: `systemDefault` falls back to the platform default chime, and
+/// `silent` mutes the alarm entirely while still firing the local
+/// notification banner so a banner-only owner gets visual feedback.
+public enum ResetAlarmSound: String, CaseIterable, Codable, Sendable {
+    case systemDefault = "system.default"
+    case glass = "Glass"
+    case submarine = "Submarine"
+    case frog = "Frog"
+    case blow = "Blow"
+    case bottle = "Bottle"
+    case tink = "Tink"
+    case sosumi = "Sosumi"
+    case silent = "silent"
+
+    /// The owner-facing label in the Settings picker.  Sentence case per
+    /// the fleet UI rule for value text, with Title Case for the leading
+    /// word restored where macOS's system sound catalogue capitalises
+    /// it (e.g., "Sosumi" rather than "sosumi").
+    public var displayName: String {
+        switch self {
+        case .systemDefault: return "Default chime"
+        case .glass: return "Glass"
+        case .submarine: return "Submarine"
+        case .frog: return "Frog"
+        case .blow: return "Blow"
+        case .bottle: return "Bottle"
+        case .tink: return "Tink"
+        case .sosumi: return "Sosumi"
+        case .silent: return "Silent (banner only)"
+        }
+    }
+
+    /// Short prose shown under the picker, justifying the choice for an
+    /// owner who has not heard the system sounds since macOS Ventura.
+    public var pickerDetail: String {
+        switch self {
+        case .systemDefault: return "The platform's standard alert tone."
+        case .glass: return "A bright tap — easy to hear in a quiet room."
+        case .submarine: return "A low, longer tone — easy to hear through headphones."
+        case .frog: return "A short ribbit — distinctive but unobtrusive."
+        case .blow: return "An airy puff — barely registers if the office is loud."
+        case .bottle: return "A cork pop — punchy and brief."
+        case .tink: return "A small bell — light, single-tone."
+        case .sosumi: return "The classic Mac alert."
+        case .silent: return "Banner only — no sound plays; the row in Glance still highlights."
+        }
+    }
+
+    /// Whether this value resolves to an audible sound on macOS.  Used to
+    /// short-circuit the `NSSound(named:)` fallback after `UNNotification`
+    /// already played one, so the alarm does not ring twice.
+    public var isAudible: Bool {
+        self != .silent
+    }
+
+    /// Convenience for the macOS picker ordering: default chime first,
+    /// classic Mac sound last, alphabetical in between.
+    public static let defaultPickerOrder: [ResetAlarmSound] = [
+        .systemDefault, .blow, .bottle, .frog, .glass, .sosumi, .submarine, .tink, .silent,
+    ]
+}

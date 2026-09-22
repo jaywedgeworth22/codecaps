@@ -62,6 +62,20 @@ public final class CompanionQuotaModel: ObservableObject {
         }
     }
 
+    /// The sound the reset alarm plays.  Persisted into the App Group
+    /// container so a sound chosen on the Mac reads back on the
+    /// companion app and survives a fresh launch on the iPhone.
+    /// Shared key is `alarmSound` — the same key the macOS
+    /// `ResetAlarmManager` writes — so the picker order and the
+    /// `silent` mute the alert on the iPhone exactly as it would on
+    /// the host Mac.
+    @Published public var alarmSound: ResetAlarmSound {
+        didSet {
+            UserDefaults.standard.set(alarmSound.rawValue, forKey: "companionAlarmSound")
+            sharedDefaults.set(alarmSound.rawValue, forKey: "alarmSound")
+        }
+    }
+
     private var previouslyExhaustedIds: Set<String> = []
     private var hasInitialized = false
 
@@ -73,6 +87,16 @@ public final class CompanionQuotaModel: ObservableObject {
             ?? UserDefaults.standard.string(forKey: "companionSyncToken") ?? ""
         self.notifyOnReset = defaults.object(forKey: "companionNotifyOnReset") as? Bool
             ?? UserDefaults.standard.object(forKey: "companionNotifyOnReset") as? Bool ?? true
+        // Read the sound from the App Group first so a value picked on
+        // Mac applies here too; fall back to a value previously stored
+        // on this device, then the platform default.
+        let sharedRaw = defaults.string(forKey: "alarmSound")
+            ?? UserDefaults.standard.string(forKey: "companionAlarmSound")
+        if let raw = sharedRaw, let picked = ResetAlarmSound(rawValue: raw) {
+            self.alarmSound = picked
+        } else {
+            self.alarmSound = .systemDefault
+        }
 
         requestNotificationPermission()
         loadLocalFallback()
@@ -182,7 +206,11 @@ public final class CompanionQuotaModel: ObservableObject {
         let content = UNMutableNotificationContent()
         content.title = "Quota Reset: \(item.title)"
         content.body = "Quota has cleared (\(item.displayPercent) remaining).  Ready for prompt turns."
-        content.sound = .default
+        // Pick the sound the user set in Settings.  `.silent` produces
+        // a nil sound so the banner still appears but no chime plays —
+        // mirroring macOS behaviour so an owner with this picker on
+        // Silent sees both Alerts running banner-only.
+        content.sound = Self.notificationSound(for: alarmSound)
 
         let request = UNNotificationRequest(
             identifier: "codecaps.companion.reset.\(item.id).\(Date().timeIntervalSince1970)",
@@ -190,6 +218,20 @@ public final class CompanionQuotaModel: ObservableObject {
             trigger: nil
         )
         UNUserNotificationCenter.current().add(request)
+    }
+
+    /// Same translation rule as `ResetAlarmManager.notificationSound(for:)`
+    /// on macOS.  Lives here as a small free function so a test or a
+    /// future preview path can call it without touching the model.
+    static func notificationSound(for sound: ResetAlarmSound) -> UNNotificationSound? {
+        switch sound {
+        case .silent:
+            return nil
+        case .systemDefault:
+            return .default
+        default:
+            return UNNotificationSound(named: UNNotificationSoundName(sound.rawValue))
+        }
     }
 
     private func loadLocalFallback() {

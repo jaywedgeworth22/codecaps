@@ -495,12 +495,30 @@ final class MonitorModel: ObservableObject {
     }
 
     var soundOnReset: Bool {
-        get { alarmManager.soundOnReset }
+        get { alarmManager.alarmSound.isAudible }
         set {
-            alarmManager.soundOnReset = newValue
+            alarmManager.alarmSound = newValue ? .systemDefault : .silent
             objectWillChange.send()
         }
     }
+
+    /// The picked sound for the reset alarm.  Backed by the same
+    /// underlying `ResetAlarmSound` value the iOS companion reads from
+    /// the App Group defaults, so a sound set on Mac carries over to
+    /// the iOS device for the same owner.  See
+    /// `Sources/QuotaCore/ResetAlarmSound.swift` for the catalogue.
+    var alarmSound: ResetAlarmSound {
+        get { alarmManager.alarmSound }
+        set {
+            alarmManager.alarmSound = newValue
+            objectWillChange.send()
+        }
+    }
+
+    /// Previews the picked sound.  Wraps the underlying manager method
+    /// so a `Settings → Notifications → Sound → Preview` button can call
+    /// without exposing the manager.
+    func previewResetSound() { alarmManager.previewChosenSound() }
 
     func isAlarmArmed(for sectionId: String) -> Bool {
         alarmManager.isAlarmArmed(for: sectionId)
