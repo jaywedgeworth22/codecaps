@@ -12,6 +12,12 @@ struct GlancePopover: View {
     /// and `⌘,` land in the same place: the Settings page last used.
     var openSettings: () -> Void
 
+    /// Rows the owner has expanded inline.  Lives in the popover so it survives
+    /// re-renders while the popover is open, and is cleared when the popover
+    /// dismisses — persisting across launches would imply the popover remembers
+    /// state about platforms that may not even be installed tomorrow.
+    @State private var expandedIds: Set<String> = []
+
     private var localSections: [DisplaySection] { model.displaySections }
     private var fleetGroups: [FleetGroup] { model.fleetGroups }
     private var showsFleetSetup: Bool { !model.syncEnabled && !model.serverEnabled }
@@ -50,16 +56,47 @@ struct GlancePopover: View {
                 .font(.system(size: 11).monospacedDigit())
                 .foregroundStyle(.secondary)
                 .lineLimit(1)
+                .minimumScaleFactor(0.85)
+            // Auto-refresh fires every 5 min (see MonitorModel.refreshTimer) and
+            // a 30-second clock ticks every time `now` updates, so the manual
+            // button used to live in the footer for redundancy.  It now sits
+            // top-right next to the time — icon-only, with the spinner replacing
+            // it while a refresh is in flight.
+            Button { model.refresh() } label: {
+                if model.isRefreshing {
+                    ProgressView().controlSize(.small).frame(width: 14, height: 14)
+                } else {
+                    Image(systemName: "arrow.clockwise")
+                        .font(.system(size: 11, weight: .medium))
+                        .frame(width: 16, height: 16)
+                }
+            }
+            .buttonStyle(.plain)
+            .foregroundStyle(.secondary)
+            .disabled(model.isRefreshing)
+            .help("Refresh Quotas")
+            .accessibilityLabel("Refresh Quotas")
         }
         .padding(.horizontal, Metrics.glanceGutter)
         .frame(height: Metrics.glanceHeaderHeight)
         .accessibilityElement(children: .combine)
     }
 
+    /// Two literal ASCII spaces on either side of the dot — the fleet "two spaces
+    /// between sentences" convention reads just as well between phrases inside a
+    /// single string, so the header breathes without a heavier separator.
     private var headerStatus: String {
         let counted = "\(model.reportingCount) of \(model.sections.count)"
         guard let checked = model.lastChecked else { return counted }
-        return "\(counted) · \(checked.formatted(date: .omitted, time: .shortened))"
+        return "\(counted)  ·  \(checked.formatted(date: .omitted, time: .shortened))"
+    }
+
+    private func toggleExpanded(_ id: String) {
+        if expandedIds.contains(id) {
+            expandedIds.remove(id)
+        } else {
+            expandedIds.insert(id)
+        }
     }
 
     // MARK: - Content
@@ -75,6 +112,8 @@ struct GlancePopover: View {
                           origin: .local,
                           markStyle: model.glanceMarkStyle(for: row.providerKey),
                           isAlarmArmed: model.isAlarmArmed(for: row.id),
+                          isExpanded: expandedIds.contains(row.id),
+                          onTap: { toggleExpanded(row.id) },
                           onToggleAlarm: { model.toggleAlarm(for: row.id) })
             }
             if !fleetGroups.isEmpty {
@@ -94,6 +133,8 @@ struct GlancePopover: View {
                                           origin: .fleet,
                                           markStyle: model.glanceMarkStyle(for: row.providerKey),
                                           isAlarmArmed: model.isAlarmArmed(for: row.id),
+                                          isExpanded: expandedIds.contains(row.id),
+                                          onTap: { toggleExpanded(row.id) },
                                           onToggleAlarm: { model.toggleAlarm(for: row.id) })
                             }
                         }
@@ -152,23 +193,6 @@ struct GlancePopover: View {
 
     private var footer: some View {
         HStack(spacing: 8) {
-            Button { model.refresh() } label: {
-                if model.isRefreshing {
-                    HStack(spacing: 6) {
-                        ProgressView().controlSize(.small).frame(width: 14, height: 14)
-                        Text("Refreshing")
-                    }
-                } else {
-                    Label("Refresh", systemImage: "arrow.clockwise")
-                }
-            }
-            .buttonStyle(.bordered)
-            .disabled(model.isRefreshing)
-            .help("Refresh Quotas")
-            .accessibilityLabel("Refresh Quotas")
-
-            Spacer(minLength: 4)
-
             Button { openSettings() } label: {
                 Image(systemName: "gearshape")
                     .font(.system(size: 13, weight: .medium))
@@ -177,6 +201,8 @@ struct GlancePopover: View {
             .buttonStyle(.plain)
             .help("Settings")
             .accessibilityLabel("Settings")
+
+            Spacer(minLength: 4)
 
             Button { openConsole(.allPlatforms) } label: {
                 HStack(spacing: 5) {
@@ -201,6 +227,14 @@ struct GlanceRow: View {
     let origin: QuotaOrigin
     let markStyle: MarkStyle
     var isAlarmArmed: Bool = false
+    /// Whether the inline expansion is shown below this row.  Driven by the
+    /// popover's `expandedIds` set, threaded down here so the chevron and the
+    /// detail list animate together.
+    var isExpanded: Bool = false
+    /// Tap handler for the row's body — opening or closing the expansion.
+    /// Alarm-arm toggles short-circuit the gesture so a stray tap on the bell
+    /// never expands a row.
+    var onTap: (() -> Void)? = nil
     var onToggleAlarm: (() -> Void)? = nil
 
     private var section: QuotaPlatformSection { row.section }
@@ -220,7 +254,7 @@ struct GlanceRow: View {
 
     private var isLive: Bool { issue == nil && section.hasFreshReport }
 
-    /// The trailing column is 58pt wide, or 106pt with no percentage, and one
+    /// The trailing column is 64pt wide, or 112pt with no percentage, and one
     /// line tall.  A reader's issue is a sentence or two, so the column carries
     /// a token and the sentence goes to the tooltip and the spoken value.
     private var trailingText: String {
@@ -244,51 +278,77 @@ struct GlanceRow: View {
     }
 
     var body: some View {
-        HStack(spacing: 0) {
-            PlatformLogo(providerKey: section.providerKey, size: 16, style: markStyle)
-                .frame(width: 16, height: 16)
-            Spacer().frame(width: 6)
-            VStack(alignment: .leading, spacing: 1) {
-                // An Antigravity row names its pool, which does not fit beside
-                // the platform in a 136pt column, so the pool takes the second
-                // line rather than being truncated away.
-                Text(row.poolTitle == nil ? row.title : row.platformTitle)
-                    .font(.system(size: 13, weight: .medium))
-                    .lineLimit(1)
-                    .truncationMode(.tail)
-                if let subtitle = [row.poolTitle, attribution].compactMap({ $0 }).first {
-                    Text(subtitle)
-                        .font(.system(size: 10))
-                        .foregroundStyle(.secondary)
+        VStack(spacing: 0) {
+            HStack(spacing: 0) {
+                PlatformLogo(providerKey: section.providerKey, size: 16, style: markStyle)
+                    .frame(width: 16, height: 16)
+                Spacer().frame(width: 6)
+                VStack(alignment: .leading, spacing: 1) {
+                    // An Antigravity row names its pool, which does not fit beside
+                    // the platform in a 136pt column, so the pool takes the second
+                    // line rather than being truncated away.
+                    Text(row.poolTitle == nil ? row.title : row.platformTitle)
+                        .font(.system(size: 13, weight: .medium))
+                        .lineLimit(1)
+                        .truncationMode(.tail)
+                    if let subtitle = [row.poolTitle, attribution].compactMap({ $0 }).first {
+                        Text(subtitle)
+                            .font(.system(size: 10))
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.85)
+                            .truncationMode(.tail)
+                    }
+                }
+                .frame(width: 136, alignment: .leading)
+                Spacer().frame(width: 8)
+                bar
+                    .frame(width: 56, height: 3)
+                Spacer().frame(width: 8)
+                if percent != nil || driving?.remainingPercent != nil {
+                    Text(percent.map { "\(Int($0.rounded()))%" } ?? "—")
+                        .font(.system(size: 15, weight: .semibold).monospacedDigit())
+                        .foregroundStyle(tint)
+                        // Hardening: the popover sits 40–48pt above the menu bar,
+                        // and an HStack's flexible space can squeeze a fixed-width
+                        // frame down a couple of points on a re-layout.  Belt and
+                        // braces — lineLimit keeps the text to one row, minScale
+                        // shrinks instead of clipping, and fixedSize blocks the
+                        // HStack from compressing the column.
                         .lineLimit(1)
                         .minimumScaleFactor(0.85)
-                        .truncationMode(.tail)
+                        .fixedSize(horizontal: true, vertical: false)
+                        .frame(width: 48, alignment: .trailing)
+                    Spacer().frame(width: 8)
+                    trailingColumn
+                        .frame(width: 64, alignment: .trailing)
+                } else {
+                    trailingColumn
+                        .frame(width: 112, alignment: .trailing)
                 }
+                Spacer().frame(width: 6)
+                // Chevron on the rightmost edge signals click-to-expand without
+                // claiming space from any of the value columns.  Rotates 180°
+                // when the row is expanded.
+                Image(systemName: "chevron.down")
+                    .font(.system(size: 9, weight: .semibold))
+                    .foregroundStyle(.tertiary)
+                    .frame(width: 10)
+                    .rotationEffect(.degrees(isExpanded ? 180 : 0))
+                    .accessibilityHidden(true)
             }
-            .frame(width: 136, alignment: .leading)
-            Spacer().frame(width: 8)
-            bar
-                .frame(width: 56, height: 3)
-            Spacer().frame(width: 8)
-            if percent != nil || driving?.remainingPercent != nil {
-                Text(percent.map { "\(Int($0.rounded()))%" } ?? "—")
-                    .font(.system(size: 15, weight: .semibold).monospacedDigit())
-                    .foregroundStyle(tint)
-                    .frame(width: 40, alignment: .trailing)
-                Spacer().frame(width: 8)
-                trailingColumn
-                    .frame(width: 58, alignment: .trailing)
-            } else {
-                trailingColumn
-                    .frame(width: 106, alignment: .trailing)
-            }
+            .padding(.horizontal, Metrics.glanceGutter)
+            .frame(height: origin == .fleet ? Metrics.glanceFleetRowHeight : Metrics.glanceLocalRowHeight)
+            .contentShape(Rectangle())
+            .onTapGesture { onTap?() }
+            .accessibilityElement(children: .combine)
+            .accessibilityLabel(row.title)
+            .accessibilityValue(spokenValue)
+            .accessibilityHint(isExpanded ? "Double-tap to collapse." : "Double-tap to expand.")
+            .help(issue ?? row.title)
+            if isExpanded { expandedSection.transition(.opacity.combined(with: .move(edge: .top))) }
         }
-        .padding(.horizontal, Metrics.glanceGutter)
-        .frame(height: origin == .fleet ? Metrics.glanceFleetRowHeight : Metrics.glanceLocalRowHeight)
-        .accessibilityElement(children: .combine)
-        .accessibilityLabel(row.title)
-        .accessibilityValue(spokenValue)
-        .help(issue ?? row.title)
+        .animation(.easeInOut(duration: 0.18), value: isExpanded)
     }
 
     @ViewBuilder
@@ -328,6 +388,40 @@ struct GlanceRow: View {
                 }
             }
         }
+    }
+
+    /// Inline expansion: every quota window the local reader (or the fleet pull)
+    /// has for this provider, one row each, with label · percent remaining ·
+    /// reset countdown.  Mirrors what the Console cards show, minus the chart —
+    /// the popover stays readable at 376pt wide.
+    @ViewBuilder
+    private var expandedSection: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            ForEach(Array(row.section.windows.enumerated()), id: \.offset) { _, snapshot in
+                HStack(spacing: 8) {
+                    Text(AntigravityDisplay.windowLabel(snapshot.window.label))
+                        .font(.system(size: 11))
+                        .foregroundStyle(.primary)
+                        .lineLimit(1)
+                        .truncationMode(.tail)
+                    Spacer(minLength: 4)
+                    Text(snapshot.remainingPercent.map { "\(Int(($0).rounded()))%" } ?? "—")
+                        .font(.system(size: 11).monospacedDigit())
+                        .foregroundStyle(.secondary)
+                        .frame(width: 40, alignment: .trailing)
+                    Text(glanceResetCountdown(snapshot.resetAt, now: now))
+                        .font(.system(size: 11).monospacedDigit())
+                        .foregroundStyle(.tertiary)
+                        .frame(width: 56, alignment: .trailing)
+                }
+                .padding(.trailing, 22)
+            }
+        }
+        .padding(.leading, 22 + Metrics.glanceGutter)
+        .padding(.top, 2)
+        .padding(.bottom, 8)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Theme.surface.opacity(0.55))
     }
 
     private var bar: some View {
