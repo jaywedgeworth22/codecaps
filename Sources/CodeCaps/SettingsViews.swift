@@ -910,7 +910,27 @@ struct SettingsNotificationsPage: View {
         SettingsPage {
             Section {
                 Toggle("Notify When Quota Resets", isOn: $model.notifyOnReset)
-                Toggle("Play Alert Sound", isOn: $model.soundOnReset)
+                Picker("Alert Sound", selection: $model.alarmSound) {
+                    ForEach(ResetAlarmSound.defaultPickerOrder, id: \.self) { sound in
+                        Text(sound.displayName).tag(sound)
+                    }
+                }
+                .pickerStyle(.menu)
+                .help("The sound played when an exhausted quota clears." + sentenceGap
+                      + "\"Silent\" mutes the alert sound entirely while keeping the notification banner.")
+                .accessibilityLabel("Alert Sound")
+
+                if model.alarmSound != .silent {
+                    Label("\(model.alarmSound.pickerDetail)", systemImage: "speaker.wave.2")
+                        .font(.system(size: 11))
+                        .foregroundStyle(.secondary)
+                        .padding(.top, 1)
+                    Button("Preview Sound") {
+                        model.previewResetSound()
+                    }
+                    .help("Preview the selected sound.")
+                    .accessibilityLabel("Preview selected sound")
+                }
             } header: {
                 Eyebrow("RESET ALERTS")
             } footer: {

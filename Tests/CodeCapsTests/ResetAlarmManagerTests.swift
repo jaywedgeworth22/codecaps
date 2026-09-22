@@ -98,9 +98,7 @@ final class ResetAlarmManagerTests: XCTestCase {
     func testTransitionFromExhaustedToUsableDispatchesAlert() {
         let manager = ResetAlarmManager(defaults: defaults)
         var receivedAlerts: [ResetAlarmNotification] = []
-        var playedSounds = 0
         manager.onNotification = { receivedAlerts.append($0) }
-        manager.onPlaySound = { playedSounds += 1 }
 
         let exhaustedWindow = makeWindow(id: "claude-5h", providerKey: "anthropic", remaining: 0)
         let exhaustedSection = makeSection(
@@ -131,7 +129,29 @@ final class ResetAlarmManagerTests: XCTestCase {
         XCTAssertEqual(receivedAlerts.first?.sectionId, "anthropic")
         XCTAssertEqual(receivedAlerts.first?.remainingPercent, 100)
         XCTAssertTrue(receivedAlerts.first?.title.contains("Claude Code") ?? false)
-        XCTAssertEqual(playedSounds, 1)
+        // The payload carries the picked sound so a custom handler can
+        // verify the Settings picker was honoured without inspecting
+        // the (private) UNNotificationSound it eventually translates to.
+        XCTAssertEqual(receivedAlerts.first?.sound, .systemDefault)
+    }
+
+    func testTransitionPicksUpPickedSound() {
+        let manager = ResetAlarmManager(defaults: defaults)
+        manager.alarmSound = .frog
+        var receivedAlerts: [ResetAlarmNotification] = []
+        manager.onNotification = { receivedAlerts.append($0) }
+
+        let exhausted = makeSection(id: "anthropic", providerKey: "anthropic", title: "Claude Code",
+                                    windows: [makeWindow(id: "claude-5h", providerKey: "anthropic", remaining: 0)],
+                                    remainingPercent: 0)
+        manager.evaluate(currentSections: [exhausted])
+
+        let reset = makeSection(id: "anthropic", providerKey: "anthropic", title: "Claude Code",
+                                windows: [makeWindow(id: "claude-5h", providerKey: "anthropic", remaining: 100)],
+                                remainingPercent: 100)
+        manager.evaluate(currentSections: [reset])
+
+        XCTAssertEqual(receivedAlerts.first?.sound, .frog)
     }
 
     func testControllingCapSuppressionInAntigravityPool() {
@@ -238,14 +258,64 @@ final class ResetAlarmManagerTests: XCTestCase {
     func testSendTestNotification() {
         let manager = ResetAlarmManager(defaults: defaults)
         var receivedAlerts: [ResetAlarmNotification] = []
-        var playedSounds = 0
         manager.onNotification = { receivedAlerts.append($0) }
-        manager.onPlaySound = { playedSounds += 1 }
 
         manager.sendTestNotification()
 
         XCTAssertEqual(receivedAlerts.count, 1)
         XCTAssertEqual(receivedAlerts.first?.sectionId, "test")
+        XCTAssertEqual(receivedAlerts.first?.sound, .systemDefault)
+    }
+
+    func testPreviewChosenSoundInvokesCallbackForAudible() {
+        let manager = ResetAlarmManager(defaults: defaults)
+        manager.alarmSound = .glass
+        var playedSounds = 0
+        manager.onPlaySound = { playedSounds += 1 }
+
+        manager.previewChosenSound()
+
         XCTAssertEqual(playedSounds, 1)
+    }
+
+    func testPreviewChosenSoundSkipsSilent() {
+        let manager = ResetAlarmManager(defaults: defaults)
+        manager.alarmSound = .silent
+        var playedSounds = 0
+        manager.onPlaySound = { playedSounds += 1 }
+
+        manager.previewChosenSound()
+
+        XCTAssertEqual(playedSounds, 0)
+    }
+
+    func testMigratesLegacySoundOnResetBool() {
+        var domain = ""
+        let store = UserDefaults(suiteName: domain + UUID().uuidString)!
+        defer { store.removePersistentDomain(forName: store.dictionaryRepresentation().keys.first! as String) }
+        store.set(true, forKey: "soundOnReset")
+
+        let manager = ResetAlarmManager(defaults: store)
+        XCTAssertEqual(manager.alarmSound, .systemDefault)
+        // Migration writes the new key; the legacy key is left in place
+        // (harmless) but the new key is the source of truth from now on.
+        XCTAssertEqual(store.string(forKey: "alarmSound"), ResetAlarmSound.systemDefault.rawValue)
+    }
+
+    func testMigratesLegacySoundOffResetBoolToSilent() {
+        let store = UserDefaults(suiteName: "codecaps.test.migrate.silent." + UUID().uuidString)!
+        store.set(false, forKey: "soundOnReset")
+
+        let manager = ResetAlarmManager(defaults: store)
+        XCTAssertEqual(manager.alarmSound, .silent)
+        XCTAssertEqual(store.string(forKey: "alarmSound"), ResetAlarmSound.silent.rawValue)
+    }
+
+    func testAlarmSoundPersistsAcrossInit() {
+        let store = UserDefaults(suiteName: "codecaps.test.persist." + UUID().uuidString)!
+        store.set(ResetAlarmSound.submarine.rawValue, forKey: "alarmSound")
+
+        let manager = ResetAlarmManager(defaults: store)
+        XCTAssertEqual(manager.alarmSound, .submarine)
     }
 }

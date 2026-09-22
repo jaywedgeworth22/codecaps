@@ -161,6 +161,14 @@ public struct CompanionContentView: View {
 
                 Section("Alerts & Notifications") {
                     Toggle("Notify on Quota Reset", isOn: $model.notifyOnReset)
+                    Picker("Reset Alert Sound", selection: $model.alarmSound) {
+                        ForEach(ResetAlarmSound.defaultPickerOrder, id: \.self) { sound in
+                            Text(sound.displayName).tag(sound)
+                        }
+                    }
+                    Text(model.alarmSound.pickerDetail)
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
                 }
 
                 Section {
