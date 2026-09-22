@@ -60,7 +60,17 @@ enum Metrics {
 
     static let consoleDefault = NSSize(width: 960, height: 640)
     static let consoleMin = NSSize(width: 820, height: 560)
-    static let sidebarWidth: CGFloat = 200
+    /// Default sidebar width, 40pt wider than the old fixed 200pt column.
+    /// Was raised because the user found the original column too narrow
+    /// for "Antigravity · Claude & GPT" rows with their subtitle pool line,
+    /// and a trailing percent that had no breathing room.  See F-01 of
+    /// `docs/design/2026-09-22-app-audit.md` for the audit this came from.
+    static let sidebarWidthDefault: CGFloat = 240
+    static let sidebarWidthMin: CGFloat = 200
+    static let sidebarWidthMax: CGFloat = 400
+    /// Kept for callers that want the previously-fixed value (none today,
+    /// but the symbol documents the migration to a resizable column).
+    static let sidebarWidth: CGFloat = sidebarWidthDefault
     static let toolbarHeight: CGFloat = 52
     static let pagePadding: CGFloat = 20
 
