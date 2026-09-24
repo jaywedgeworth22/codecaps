@@ -3,4 +3,5 @@
 dist/
 DerivedData/
 *.xcuserstate
+xcuserdata/
 _site/

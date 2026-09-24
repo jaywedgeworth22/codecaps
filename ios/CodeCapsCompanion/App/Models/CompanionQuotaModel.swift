@@ -24,6 +24,36 @@ public struct CompanionQuotaItem: Identifiable, Codable, Equatable {
         if remainingPercent < 20 { return Color(red: 0.95, green: 0.65, blue: 0.15) }
         return Color(red: 0.10, green: 0.70, blue: 0.45)
     }
+
+    public var providerLogoName: String? {
+        let key = providerKey.lowercased()
+        let lowId = id.lowercased()
+        if lowId.contains("gemini") { return "provider-gemini" }
+        if lowId.contains("third-party") { return "provider-antigravity" }
+        if key.contains("anthropic") || key.contains("claude") { return "provider-claude" }
+        if key.contains("openai") || key.contains("codex") { return "provider-openai" }
+        if key.contains("cursor") { return "provider-cursor" }
+        if key.contains("grok-bot") { return "provider-grok-bot" }
+        if key.contains("grok") || key.contains("xai") { return "provider-grok" }
+        if key.contains("minimax") { return "provider-minimax" }
+        if key.contains("antigravity") || key.contains("gemini") { return "provider-gemini" }
+        return nil
+    }
+
+    public var fallbackSymbolName: String {
+        let key = providerKey.lowercased()
+        let lowId = id.lowercased()
+        if lowId.contains("third-party") { return "sparkles" }
+        if lowId.contains("gemini") { return "sparkles" }
+        if key.contains("cursor") { return "chevron.left.forwardslash.chevron.right" }
+        if key.contains("grok-bot") { return "sparkles.tv" }
+        if key.contains("grok") { return "sparkle" }
+        if key.contains("minimax") { return "waveform" }
+        if key.contains("openai") || key.contains("codex") { return "apple.terminal" }
+        if key.contains("anthropic") || key.contains("claude") { return "brain" }
+        if key.contains("antigravity") || key.contains("gemini") { return "sparkles" }
+        return "cpu"
+    }
 }
 
 /// The core observable model driving the CodeCaps iOS companion app.
@@ -141,44 +171,212 @@ public final class CompanionQuotaModel: ObservableObject {
         lastUpdated = Date()
     }
 
-    private func parseSnapshot(data: Data) {
-        // Parse wire format windows and build companion items
-        struct Envelope: Decodable {
-            let windows: [RawWindow]?
-            struct RawWindow: Decodable {
-                let id: String
-                let provider: String
-                let providerKey: String?
-                let label: String
-                let remainingPercent: Double?
-                let isExhausted: Bool?
-            }
-        }
+    private struct WireEnvelope: Decodable {
+        let windows: [WireRawWindow]?
+    }
 
-        guard let envelope = try? JSONDecoder().decode(Envelope.self, from: data),
+    private struct WireRawWindow: Decodable {
+        let id: String
+        let provider: String
+        let providerKey: String?
+        let label: String
+        let remainingPercent: Double?
+        let isExhausted: Bool?
+        let modelType: String?
+        let modelId: String?
+    }
+
+    private func parseSnapshot(data: Data) {
+        guard let envelope = try? JSONDecoder().decode(WireEnvelope.self, from: data),
               let rawWindows = envelope.windows else { return }
 
         var newItems: [CompanionQuotaItem] = []
-        for w in rawWindows {
-            let pKey = w.providerKey ?? w.provider.lowercased()
-            let pct = w.remainingPercent
-            let exhausted = (pct ?? 100) <= 0 || (w.isExhausted ?? false)
-            let existingArmed = items.first(where: { $0.id == w.id })?.isAlarmArmed ?? false
+        var antigravityWindows: [WireRawWindow] = []
 
-            newItems.append(CompanionQuotaItem(
-                id: w.id,
-                providerKey: pKey,
-                title: w.label,
-                subtitle: w.provider,
-                remainingPercent: pct,
-                resetAt: nil,
-                isExhausted: exhausted,
-                isAlarmArmed: existingArmed
-            ))
+        for w in rawWindows {
+            let pKey = (w.providerKey ?? w.provider).lowercased()
+            let isAntigravity = pKey.contains("antigravity") || w.id.lowercased().contains("antigravity") || w.provider.lowercased().contains("antigravity")
+            if isAntigravity {
+                antigravityWindows.append(w)
+            } else {
+                let pct = w.remainingPercent
+                let exhausted = (pct ?? 100) <= 0 || (w.isExhausted ?? false)
+                let existingArmed = items.first(where: { $0.id == w.id })?.isAlarmArmed ?? false
+
+                let (formattedTitle, formattedSubtitle) = Self.formatTitleAndSubtitle(
+                    provider: w.provider,
+                    providerKey: pKey,
+                    label: w.label
+                )
+
+                newItems.append(CompanionQuotaItem(
+                    id: w.id,
+                    providerKey: pKey,
+                    title: formattedTitle,
+                    subtitle: formattedSubtitle,
+                    remainingPercent: pct,
+                    resetAt: nil,
+                    isExhausted: exhausted,
+                    isAlarmArmed: existingArmed
+                ))
+            }
+        }
+
+        // Consolidate Antigravity into exactly two pools: Gemini and Third-Party
+        if !antigravityWindows.isEmpty {
+            let geminiWindows = antigravityWindows.filter {
+                let s = ($0.id + " " + $0.label + " " + ($0.modelType ?? "") + " " + ($0.modelId ?? "")).lowercased()
+                return s.contains("gemini")
+            }
+            let thirdPartyWindows = antigravityWindows.filter {
+                let s = ($0.id + " " + $0.label + " " + ($0.modelType ?? "") + " " + ($0.modelId ?? "")).lowercased()
+                return !s.contains("gemini")
+            }
+
+            if let geminiItem = consolidateAntigravityPool(
+                poolKey: "gemini",
+                title: "Antigravity · Gemini",
+                defaultSubtitle: "Gemini Models",
+                windows: geminiWindows
+            ) {
+                newItems.append(geminiItem)
+            }
+
+            if let thirdPartyItem = consolidateAntigravityPool(
+                poolKey: "third-party",
+                title: "Antigravity · Third-Party",
+                defaultSubtitle: "Claude & GPT",
+                windows: thirdPartyWindows
+            ) {
+                newItems.append(thirdPartyItem)
+            }
         }
 
         evaluateResets(newItems: newItems)
         self.items = newItems
+    }
+
+    private func consolidateAntigravityPool(
+        poolKey: String,
+        title: String,
+        defaultSubtitle: String,
+        windows: [WireRawWindow]
+    ) -> CompanionQuotaItem? {
+        guard !windows.isEmpty else { return nil }
+
+        let itemId = "antigravity:\(poolKey)"
+        let existingArmed = items.first(where: { $0.id == itemId })?.isAlarmArmed ?? false
+
+        // Identify weekly vs 5-hour
+        let weeklyWin = windows.first {
+            let s = ($0.id + " " + $0.label).lowercased()
+            return s.contains("weekly") || s.contains("1w") || s.contains("7d")
+        }
+        let fiveHourWin = windows.first {
+            let s = ($0.id + " " + $0.label).lowercased()
+            return s.contains("5h") || s.contains("5-hour") || s.contains("interval")
+        }
+
+        // Controlling logic:
+        // If weekly is exhausted (0%), 5-hour is masked
+        let weeklyPct = weeklyWin?.remainingPercent
+        let weeklyExhausted = (weeklyPct ?? 100) <= 0 || (weeklyWin?.isExhausted ?? false)
+
+        let controllingPct: Double?
+        let isExhausted: Bool
+        let subtitle: String
+
+        if weeklyExhausted && weeklyWin != nil {
+            controllingPct = weeklyPct ?? 0
+            isExhausted = true
+            subtitle = "\(defaultSubtitle) · Weekly limit exhausted"
+        } else {
+            let validPercents = [fiveHourWin?.remainingPercent, weeklyWin?.remainingPercent].compactMap { $0 }
+            if validPercents.isEmpty {
+                let allPcts = windows.compactMap { $0.remainingPercent }
+                controllingPct = allPcts.min()
+                isExhausted = (controllingPct ?? 100) <= 0
+                subtitle = defaultSubtitle
+            } else {
+                controllingPct = validPercents.min()
+                isExhausted = (controllingPct ?? 100) <= 0
+                if let fPct = fiveHourWin?.remainingPercent, let wPct = weeklyWin?.remainingPercent {
+                    if fPct < wPct {
+                        subtitle = "\(defaultSubtitle) · 5h pool (Weekly \(Int(wPct.rounded()))%)"
+                    } else if wPct < fPct {
+                        subtitle = "\(defaultSubtitle) · Weekly pool (5h \(Int(fPct.rounded()))%)"
+                    } else {
+                        subtitle = "\(defaultSubtitle) · 5h & Weekly"
+                    }
+                } else {
+                    subtitle = "\(defaultSubtitle) · 5-hour & Weekly"
+                }
+            }
+        }
+
+        return CompanionQuotaItem(
+            id: itemId,
+            providerKey: "google-antigravity",
+            title: title,
+            subtitle: subtitle,
+            remainingPercent: controllingPct,
+            resetAt: nil,
+            isExhausted: isExhausted,
+            isAlarmArmed: existingArmed
+        )
+    }
+
+    public static func formatTitleAndSubtitle(
+        provider: String,
+        providerKey: String,
+        label: String
+    ) -> (String, String) {
+        let pKey = providerKey.lowercased()
+        let prov = provider.lowercased()
+
+        if pKey.contains("anthropic") || prov.contains("anthropic") || prov.contains("claude") {
+            let sub = formatCadence(label)
+            return ("Claude Code", sub)
+        }
+        if pKey.contains("openai") || prov.contains("openai") || prov.contains("codex") {
+            let sub = formatCadence(label)
+            return ("Codex", sub)
+        }
+        if pKey.contains("cursor") || prov.contains("cursor") {
+            let sub = label.isEmpty ? "Included plan" : label
+            return ("Cursor", sub)
+        }
+        if pKey.contains("grok-bot") || prov.contains("grok-bot") || prov.contains("grok bot") {
+            let sub = formatCadence(label)
+            return ("Grok Bot", sub)
+        }
+        if pKey.contains("grok") || prov.contains("grok") || pKey.contains("xai") || prov.contains("xai") {
+            let sub = formatCadence(label)
+            return ("Grok", sub)
+        }
+        if pKey.contains("minimax") || prov.contains("minimax") {
+            let sub = formatCadence(label)
+            return ("MiniMax", sub)
+        }
+
+        return (label, provider)
+    }
+
+    public static func formatCadence(_ label: String) -> String {
+        let low = label.lowercased()
+        if low.contains("5h") || low.contains("5-hour") || low.contains("five_hour") {
+            return "5-hour window"
+        }
+        if low.contains("7d") || low.contains("seven_day") {
+            return "7-day window"
+        }
+        if low.contains("1w") || low.contains("weekly") {
+            return "Weekly window"
+        }
+        if low.contains("1d") || low.contains("daily") {
+            return "Daily window"
+        }
+        return label
     }
 
     private func evaluateResets(newItems: [CompanionQuotaItem]) {
@@ -254,12 +452,14 @@ public final class CompanionQuotaModel: ObservableObject {
 
         if items.isEmpty {
             items = [
-                CompanionQuotaItem(id: "antigravity:gemini", providerKey: "google-antigravity", title: "Antigravity · Gemini", subtitle: "5-hour pool", remainingPercent: 78, resetAt: nil, isExhausted: false, isAlarmArmed: false),
-                CompanionQuotaItem(id: "antigravity:third-party", providerKey: "google-antigravity", title: "Antigravity · Claude & GPT", subtitle: "5-hour pool", remainingPercent: 42, resetAt: nil, isExhausted: false, isAlarmArmed: false),
-                CompanionQuotaItem(id: "claude", providerKey: "anthropic", title: "Claude Code", subtitle: "Pro seat", remainingPercent: 65, resetAt: nil, isExhausted: false, isAlarmArmed: false),
-                CompanionQuotaItem(id: "cursor", providerKey: "cursor", title: "Cursor", subtitle: "Fast requests", remainingPercent: 12, resetAt: nil, isExhausted: false, isAlarmArmed: false),
-                CompanionQuotaItem(id: "minimax", providerKey: "minimax", title: "MiniMax Code", subtitle: "Tokens balance", remainingPercent: 88, resetAt: nil, isExhausted: false, isAlarmArmed: false),
-                CompanionQuotaItem(id: "codex", providerKey: "openai", title: "Codex", subtitle: "Local CLI", remainingPercent: 95, resetAt: nil, isExhausted: false, isAlarmArmed: false)
+                CompanionQuotaItem(id: "claude:5h", providerKey: "anthropic", title: "Claude Code", subtitle: "5-hour window", remainingPercent: 100, resetAt: nil, isExhausted: false, isAlarmArmed: false),
+                CompanionQuotaItem(id: "claude:7d", providerKey: "anthropic", title: "Claude Code", subtitle: "7-day window", remainingPercent: 100, resetAt: nil, isExhausted: false, isAlarmArmed: false),
+                CompanionQuotaItem(id: "antigravity:gemini", providerKey: "google-antigravity", title: "Antigravity · Gemini", subtitle: "Gemini Models · 5h & Weekly", remainingPercent: 100, resetAt: nil, isExhausted: false, isAlarmArmed: false),
+                CompanionQuotaItem(id: "antigravity:third-party", providerKey: "google-antigravity", title: "Antigravity · Third-Party", subtitle: "Claude & GPT · 5h & Weekly", remainingPercent: 100, resetAt: nil, isExhausted: false, isAlarmArmed: false),
+                CompanionQuotaItem(id: "cursor", providerKey: "cursor", title: "Cursor", subtitle: "Included plan", remainingPercent: 19, resetAt: nil, isExhausted: false, isAlarmArmed: false),
+                CompanionQuotaItem(id: "grok-bot", providerKey: "grok-bot", title: "Grok Bot", subtitle: "Weekly window", remainingPercent: 87, resetAt: nil, isExhausted: false, isAlarmArmed: false),
+                CompanionQuotaItem(id: "minimax", providerKey: "minimax", title: "MiniMax", subtitle: "General (5h)", remainingPercent: 88, resetAt: nil, isExhausted: false, isAlarmArmed: false),
+                CompanionQuotaItem(id: "codex", providerKey: "openai", title: "Codex", subtitle: "Weekly window", remainingPercent: 95, resetAt: nil, isExhausted: false, isAlarmArmed: false)
             ]
         }
     }
