@@ -97,7 +97,9 @@ public struct CompanionContentView: View {
 
     private func quotaCard(_ item: CompanionQuotaItem) -> some View {
         VStack(alignment: .leading, spacing: 10) {
-            HStack(alignment: .center) {
+            HStack(alignment: .center, spacing: 12) {
+                CompanionProviderLogo(item: item)
+
                 VStack(alignment: .leading, spacing: 2) {
                     Text(item.title)
                         .font(.system(size: 15, weight: .semibold))
@@ -195,3 +197,58 @@ public struct CompanionContentView: View {
         }
     }
 }
+
+// MARK: - Provider Logo
+
+public struct CompanionProviderLogo: View {
+    public let item: CompanionQuotaItem
+    public var size: CGFloat = 36
+
+    private var isMonochrome: Bool {
+        guard let name = item.providerLogoName else { return false }
+        return name == "provider-openai" || name == "provider-cursor" || name == "provider-grok" || name == "provider-grok-bot"
+    }
+
+    public var body: some View {
+        ZStack {
+            #if os(iOS)
+            RoundedRectangle(cornerRadius: 9, style: .continuous)
+                .fill(Color(uiColor: .tertiarySystemGroupedBackground))
+            #else
+            RoundedRectangle(cornerRadius: 9, style: .continuous)
+                .fill(Color.secondary.opacity(0.1))
+            #endif
+
+            if let logoName = item.providerLogoName, logoExists(logoName) {
+                if isMonochrome {
+                    Image(logoName)
+                        .renderingMode(.template)
+                        .resizable()
+                        .aspectRatio(contentMode: .fit)
+                        .foregroundStyle(.primary)
+                        .frame(width: size * 0.62, height: size * 0.62)
+                } else {
+                    Image(logoName)
+                        .renderingMode(.original)
+                        .resizable()
+                        .aspectRatio(contentMode: .fit)
+                        .frame(width: size * 0.62, height: size * 0.62)
+                }
+            } else {
+                Image(systemName: item.fallbackSymbolName)
+                    .font(.system(size: size * 0.45, weight: .medium))
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .frame(width: size, height: size)
+    }
+
+    private func logoExists(_ name: String) -> Bool {
+        #if os(iOS)
+        return UIImage(named: name) != nil
+        #else
+        return NSImage(named: NSImage.Name(name)) != nil
+        #endif
+    }
+}
+
