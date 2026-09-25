@@ -119,8 +119,12 @@ enum TokenStore {
     /// item was still there, and the owner was told to unlock a Keychain that
     /// was already unlocked.  Replacing only the item's data needs the
     /// encrypt authorization, which that same access list grants to any
-    /// application, so the update is the way through.  It never prompts:
-    /// if macOS wants a panel, the update fails and the real status is shown.
+    /// application, so the update is the way through.  It asks macOS not to
+    /// prompt (`kSecUseAuthenticationUIFail`), but that key does not suppress
+    /// every legacy access-list or partition panel — a probe of this exact
+    /// item still raised one.  On a save the owner started that is
+    /// acceptable: a panel left unanswered ends in the 30 second timeout
+    /// message instead of a silent hang.
     private static func saveSynchronously(_ token: String, server: String, service: String) -> OSStatus {
         let query = base(server, service: service)
         let data = Data(token.utf8)
