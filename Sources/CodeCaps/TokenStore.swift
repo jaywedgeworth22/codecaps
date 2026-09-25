@@ -98,41 +98,73 @@ enum TokenStore {
     }
 
     static func save(_ token: String, server: String, service: String = readService) async throws {
-        let status = await bounded(OSStatus(errSecInteractionNotAllowed), .userInitiated) {
+        let status = await bounded(nil as OSStatus?, .userInitiated) {
             saveSynchronously(token, server: server, service: service)
         }
-        guard status == errSecSuccess else { throw Failure.write }
+        guard status == errSecSuccess else { throw Failure.write(status: status, service: service) }
     }
 
-    /// Delete, then add — never `SecItemUpdate`.  An item written by a build
-    /// with a different code identity carries an access list this build is not
-    /// on, and updating it needs an authorization the bound would cut off.
+    /// Delete, then add; and when the delete is refused, update in place.
     ///
-    /// Measured on 2026-09-17 with two differently signed builds: the second
-    /// build's `SecItemCopyMatching` found nothing, while `SecItemDelete` on
-    /// that same item returned `errSecSuccess` in under twenty milliseconds
-    /// with no authorization panel.  Deleting is therefore the way back in —
-    /// the token is rewritten carrying this build's own access list instead of
-    /// fighting the old one.
+    /// Delete-then-add is preferred because the rewritten item carries this
+    /// build's own access list instead of an older build's.  Measured on
+    /// 2026-09-17 with two differently signed builds, `SecItemDelete` on the
+    /// other build's item returned `errSecSuccess` with no panel.
+    ///
+    /// It does not always.  On 2026-09-25 the owner's Ingest Token item, first
+    /// written on 2026-09-15 by an ad-hoc AgentBar build, refused the delete
+    /// with `errSecInvalidOwnerEdit` (-25244): the item's owner entry trusts no
+    /// application, and none of the builds on its access list is this one.
+    /// The add then failed with `errSecDuplicateItem` (-25299), because the old
+    /// item was still there, and the owner was told to unlock a Keychain that
+    /// was already unlocked.  Replacing only the item's data needs the
+    /// encrypt authorization, which that same access list grants to any
+    /// application, so the update is the way through.  It asks macOS not to
+    /// prompt (`kSecUseAuthenticationUIFail`), but that key does not suppress
+    /// every legacy access-list or partition panel — a probe of this exact
+    /// item still raised one.  On a save the owner started that is
+    /// acceptable: a panel left unanswered ends in the 30 second timeout
+    /// message instead of a silent hang.
     private static func saveSynchronously(_ token: String, server: String, service: String) -> OSStatus {
         let query = base(server, service: service)
+        let data = Data(token.utf8)
         // Status codes only, at notice level so they persist in the log store.
         // Nothing here ever logs a token.
         let deleted = SecItemDelete(query as CFDictionary)
         log.notice("keychain delete-before-add status \(deleted, privacy: .public)")
-        var item = query
-        item[kSecValueData as String] = Data(token.utf8)
-        item[kSecAttrAccessible as String] = kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
-        let added = SecItemAdd(item as CFDictionary, nil)
-        log.notice("keychain add status \(added, privacy: .public)")
-        return added
+        guard shouldUpdateInPlace(afterDelete: deleted) else {
+            var item = query
+            item[kSecValueData as String] = data
+            item[kSecAttrAccessible as String] = kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
+            let added = SecItemAdd(item as CFDictionary, nil)
+            log.notice("keychain add status \(added, privacy: .public)")
+            return added
+        }
+        var match = query
+        match[kSecUseAuthenticationUI as String] = kSecUseAuthenticationUIFail
+        let updated = SecItemUpdate(match as CFDictionary, [kSecValueData as String: data] as CFDictionary)
+        log.notice("keychain update-in-place status \(updated, privacy: .public)")
+        // The delete's refusal is the more useful thing to report when the
+        // update fails too: it is what the owner has to clear.
+        return updated == errSecSuccess ? updated : deleted
+    }
+
+    /// A delete that removed the item, or found none, leaves room for a clean
+    /// add.  Any other answer means the old item is still there, so an add
+    /// could only collide with it.
+    static func shouldUpdateInPlace(afterDelete status: OSStatus) -> Bool {
+        status != errSecSuccess && status != errSecItemNotFound
     }
 
     static func delete(server: String, service: String = readService) async throws {
-        let status = await bounded(OSStatus(errSecInteractionNotAllowed), .userInitiated) {
-            SecItemDelete(base(server, service: service) as CFDictionary)
+        let status = await bounded(nil as OSStatus?, .userInitiated) {
+            let deleted = SecItemDelete(base(server, service: service) as CFDictionary)
+            log.notice("keychain delete status \(deleted, privacy: .public)")
+            return deleted
         }
-        guard status == errSecSuccess || status == errSecItemNotFound else { throw Failure.write }
+        guard status == errSecSuccess || status == errSecItemNotFound else {
+            throw Failure.write(status: status, service: service)
+        }
     }
 
     /// Runs a Keychain call with a deadline, and deliberately without a shared
@@ -174,15 +206,48 @@ enum TokenStore {
          kSecAttrAccount as String: server]
     }
 
-    enum Failure: LocalizedError {
-        case read, write
+    enum Failure: LocalizedError, Equatable {
+        case read
+        /// A save or delete that did not succeed.  `status` is the `OSStatus`
+        /// macOS returned, or nil when the call was still running at its bound.
+        case write(status: OSStatus?, service: String)
+
         var errorDescription: String? {
             switch self {
             // The old wording named the problem and left the owner with
             // nothing to do about it.  This one points at the button.
             case .read: return "The saved token is unavailable in Keychain.\u{00A0} Re-authorize it in Sources & Fleet, or paste it again."
-            case .write: return "Keychain could not save the token.\u{00A0} Unlock your login Keychain and try again."
+            case let .write(status, service): return TokenStore.writeFailureMessage(status: status, service: service)
             }
+        }
+    }
+
+    /// What the owner reads when a save or delete fails.  Every failure used to
+    /// say "Unlock your login Keychain", including the ones a locked Keychain
+    /// cannot cause, so the real status is named and only the locked case
+    /// asks for an unlock.
+    static func writeFailureMessage(status: OSStatus?, service: String) -> String {
+        let gap = "\u{00A0} "
+        guard let status else {
+            return "Keychain did not answer within 30 seconds." + gap
+                + "Look for a macOS Keychain panel behind other windows, answer it, and try again."
+        }
+        switch status {
+        case errSecInteractionNotAllowed, errSecAuthFailed:
+            return "Keychain could not save the token (error \(status))." + gap
+                + "Unlock your login Keychain and try again."
+        case errSecInvalidOwnerEdit, errSecDuplicateItem:
+            return "An older build's saved token is in the way (Keychain error \(status))." + gap
+                + "In Keychain Access, delete the item named \(service), then paste the token again."
+        case errSecMissingEntitlement:
+            return "This build cannot use the Keychain (error \(status))." + gap
+                + "Reinstall CodeCaps with script/build_and_run.sh, then paste the token again."
+        default:
+            let detail = (SecCopyErrorMessageString(status, nil) as String?)
+                .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) } ?? ""
+            let reason = detail.isEmpty || detail.hasSuffix(".") ? detail : detail + "."
+            return "Keychain could not save the token (error \(status))."
+                + (reason.isEmpty ? "" : gap + reason)
         }
     }
 }
