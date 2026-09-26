@@ -1,0 +1,45 @@
+name: Swift CI
+
+# Validates the SwiftPM Mac package (Sources/Tests at repo root).
+# The iOS companion job's SCHEME is a best guess: the checked-in
+# CodeCapsCompanion.xcodeproj has no shared schemes
+# (no xcshareddata/xcschemes), so verify the scheme name on first run.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+env:
+  # REVIEW: adjust if the companion project's scheme is named differently.
+  SCHEME: CodeCapsCompanion
+
+jobs:
+  package:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Swift build
+        run: swift build
+      - name: Swift test
+        run: swift test
+
+  companion:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: List schemes (debug)
+        run: |
+          cd ios/CodeCapsCompanion
+          xcodebuild -list -project CodeCapsCompanion.xcodeproj
+      - name: Build companion (iOS Simulator, no signing)
+        run: |
+          cd ios/CodeCapsCompanion
+          xcodebuild -project CodeCapsCompanion.xcodeproj \
+            -scheme "$SCHEME" \
+            -destination 'generic/platform=iOS Simulator' \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGN_IDENTITY="" \
+            build
